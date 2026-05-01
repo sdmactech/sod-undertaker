@@ -79,9 +79,7 @@ async function renderDashboard() {
     document.getElementById('stat-stock').textContent     = s.total_stock;
     document.getElementById('stat-ingstock').textContent  = s.ing_stock;
     document.getElementById('stat-maxpayout').textContent = `$${s.max_payout}`;
-    const bv = document.getElementById('stat-bestvalue');
-    bv.textContent = s.best_value_pct != null ? `${s.best_value} (+${s.best_value_pct}%)` : s.best_value;
-    bv.style.fontSize = '1rem';
+    document.getElementById('stat-totalstock').textContent = s.total_stock;
   } catch(e) { console.error(e); }
 
   const listEl = document.getElementById('dashStockList');
