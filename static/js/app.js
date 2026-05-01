@@ -539,6 +539,8 @@ function closeIngStockModal() { document.getElementById('ingStockModalBackdrop')
 /* ════════════════════════════════════════════
    PAYOUT CALCULATOR
    ════════════════════════════════════════════ */
+const BASE_PAYOUT = 15;
+
 function renderCalculator() {
   const list = document.getElementById('calcItemList');
   list.innerHTML = state.items.map(item=>`
@@ -546,17 +548,12 @@ function renderCalculator() {
       <input type="checkbox" class="calc-item-check" />
       <div class="calc-item-info">
         <div class="calc-item-name">${item.icon||'📦'} ${esc(item.name)}</div>
-        <div class="calc-item-payout">${item.adds_to_payout!=null?'+$'+item.adds_to_payout+' payout':'No payout set'}</div>
-      </div>
-      <div class="calc-item-qty">
-        <label style="font-size:0.75rem;color:var(--text-muted);font-family:var(--font-mono);">QTY</label>
-        <input type="number" class="calc-qty-input" value="1" min="1" max="99"/>
+        <div class="calc-item-payout">${item.adds_to_payout!=null?'+$'+item.adds_to_payout+' to payout':'No payout set'}</div>
       </div>
     </div>`).join('');
   list.querySelectorAll('.calc-item-row').forEach(row=>{
     const cb = row.querySelector('.calc-item-check');
     cb.addEventListener('change', e=>{ row.classList.toggle('selected',e.target.checked); updateCalculator(); });
-    row.querySelector('.calc-qty-input').addEventListener('change', updateCalculator);
   });
   updateCalculator();
 }
@@ -567,31 +564,49 @@ function updateCalculator() {
   const costEl   = document.getElementById('calcCost');
   const profitEl = document.getElementById('calcProfit');
   const profitRow= document.getElementById('calcProfitRow');
-  let totalPayout=0, totalCost=0, hasCost=false;
-  const rows=[];
+
+  let addedPayout = 0, totalCost = 0, hasCost = false;
+  const rows = [];
+
   document.querySelectorAll('.calc-item-row').forEach(row=>{
-    const cb  = row.querySelector('.calc-item-check');
-    const qty = parseInt(row.querySelector('.calc-qty-input').value)||1;
+    const cb = row.querySelector('.calc-item-check');
     if (!cb.checked) return;
     const item = state.items.find(i=>i.id===parseInt(row.dataset.id)); if(!item) return;
-    const lineTotal = (item.adds_to_payout||0)*qty;
-    totalPayout += lineTotal;
-    if (item.cost_numeric!=null) { totalCost += item.cost_numeric*qty; hasCost=true; }
-    rows.push({ name:item.name, icon:item.icon, qty, lineTotal });
+    const lineTotal = item.adds_to_payout || 0;
+    addedPayout += lineTotal;
+    if (item.cost_numeric!=null) { totalCost += item.cost_numeric; hasCost=true; }
+    rows.push({ name:item.name, icon:item.icon, lineTotal });
   });
-  if (!rows.length) {
-    summary.innerHTML=`<p style="color:var(--text-muted);font-style:italic;font-size:0.9rem;">Select items above to calculate payout.</p>`;
-    totalEl.textContent='$0'; costEl.textContent='—'; profitRow.style.display='none';
+
+  const totalPayout = BASE_PAYOUT + addedPayout;
+
+  // Build summary rows — base payout always first
+  let summaryHtml = `<div class="calc-summary-row base-payout-row">
+    <span>⚰️ Base Burial Payout</span>
+    <span>$${BASE_PAYOUT}</span>
+  </div>`;
+
+  if (rows.length) {
+    summaryHtml += rows.map(r=>`
+      <div class="calc-summary-row">
+        <span>${r.icon||'📦'} ${esc(r.name)}</span>
+        <span>+$${r.lineTotal.toFixed(0)}</span>
+      </div>`).join('');
   } else {
-    summary.innerHTML=rows.map(r=>`<div class="calc-summary-row"><span>${r.icon||'📦'} ${esc(r.name)} ×${r.qty}</span><span>$${r.lineTotal.toFixed(0)}</span></div>`).join('');
-    totalEl.textContent=`$${totalPayout.toFixed(0)}`;
-    if (hasCost) {
-      costEl.textContent = `$${totalCost.toFixed(0)}`;
-      const profit = totalPayout - totalCost;
-      profitEl.textContent = `$${profit.toFixed(0)} (${totalCost>0?Math.round((profit/totalCost)*100):0}% ROI)`;
-      profitEl.style.color = profit>=0 ? 'var(--green-light)' : '#d46060';
-      profitRow.style.display='flex';
-    } else { costEl.textContent='—'; profitRow.style.display='none'; }
+    summaryHtml += `<p style="color:var(--text-muted);font-style:italic;font-size:0.88rem;padding:6px 0;">No add-on items selected.</p>`;
+  }
+
+  summary.innerHTML = summaryHtml;
+  totalEl.textContent = `$${totalPayout.toFixed(0)}`;
+
+  if (hasCost) {
+    costEl.textContent = `$${totalCost.toFixed(0)}`;
+    const profit = totalPayout - totalCost;
+    profitEl.textContent = `$${profit.toFixed(0)} (${totalCost>0?Math.round((profit/totalCost)*100):0}% ROI)`;
+    profitEl.style.color = profit>=0 ? 'var(--green-light)' : '#d46060';
+    profitRow.style.display='flex';
+  } else {
+    costEl.textContent='—'; profitRow.style.display='none';
   }
 }
 

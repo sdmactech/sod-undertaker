@@ -781,6 +781,8 @@ body {
 .calc-summary-row { display: flex; justify-content: space-between; font-size: 0.9rem; color: var(--cream-dim); padding: 4px 0; border-bottom: 1px solid rgba(58,42,24,0.4); }
 .calc-summary-row:last-child { border-bottom: none; }
 .calc-summary-row span:last-child { color: var(--gold); font-family: var(--font-heading); }
+.base-payout-row { color: var(--cream); font-weight: 600; }
+.base-payout-row span:last-child { color: var(--gold-light); }
 .calc-total-row {
   display: flex;
   justify-content: space-between;
