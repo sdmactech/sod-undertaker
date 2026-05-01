@@ -8,6 +8,7 @@ const state = {
   items: [], ingStock: [],
   currentView: 'dashboard', deleteTarget: null,
   sharedNames: new Set(), // item names that exist in both tables
+  craftableCounts: {}, // item.id → how many could be crafted right now
 };
 
 /* ─── API ─── */
@@ -62,10 +63,21 @@ function setView(name) {
 }
 
 async function loadAll() {
-  const [items, ingStock] = await Promise.all([GET('/api/items'), GET('/api/ingredient_stock')]);
-  state.items    = items;
-  state.ingStock = ingStock;
+  const [items, ingStock, craftableCounts] = await Promise.all([
+    GET('/api/items'),
+    GET('/api/ingredient_stock'),
+    GET('/api/items/craftable_counts'),
+  ]);
+  state.items           = items;
+  state.ingStock        = ingStock;
+  state.craftableCounts = craftableCounts || {};
   computeSharedNames();
+}
+
+async function refreshCraftableCounts() {
+  try {
+    state.craftableCounts = await GET('/api/items/craftable_counts');
+  } catch(e) { console.warn('Could not refresh craftable counts', e); }
 }
 
 /* ════════════════════════════════════════════
@@ -116,6 +128,8 @@ async function renderItems() {
   const search  = (document.getElementById('itemSearch').value||'').toLowerCase();
   const sortVal = document.getElementById('sortFilter').value;
   document.getElementById('bestValueBanner').style.display = sortVal==='profit' ? 'flex' : 'none';
+  // Always refresh craftable counts so they reflect current ingredient stock
+  await refreshCraftableCounts();
   let items;
   try { items = await GET(`/api/items?sort=${sortVal}`); } catch(e) { items = state.items; }
   const filtered = items.filter(item =>
@@ -169,15 +183,23 @@ function itemCardHtml(item, rank) {
   const notesHtml = item.notes ? `<div class="item-notes">📋 ${esc(item.notes)}</div>` : '';
   const craftBadge= item.can_craft ? `<span class="craft-badge yes">🛠️ Craftable</span>` : `<span class="craft-badge no">🛒 Purchase</span>`;
   const obtainHtml= item.obtain_note ? `<div class="item-stat"><span class="item-stat-label">Obtain</span><span class="item-stat-value" style="font-size:0.78rem;color:var(--cream-dim);">${esc(item.obtain_note)}</span></div>` : '';
-  const rankClass = rank===0?'rank-1':rank===1?'rank-2':rank===2?'rank-3':'';
-  const rankBadge = rank!=null&&rank<3 ? `<div class="rank-badge">${['🥇','🥈','🥉'][rank]} #${rank+1} ROI</div>` : '';
-  const profitHtml= `<div class="item-stat"><span class="item-stat-label">Profit ROI</span><span class="item-stat-value">${profitBadgeHtml(item.profit_pct)}</span></div>`;
   const syncedBadge = state.sharedNames.has(item.name)
     ? `<span class="synced-badge" title="Stock is synced with Ingredient Storage">🔄 Synced</span>` : '';
 
+  // Could Craft row — only for craftable items
+  let couldCraftHtml = '';
+  if (item.can_craft) {
+    const count = state.craftableCounts[item.id];
+    const countNum = (count === null || count === undefined) ? '?' : count;
+    const cls = countNum === 0 ? 'could-craft-zero' : countNum >= 3 ? 'could-craft-good' : 'could-craft-low';
+    couldCraftHtml = `<div class="item-stat could-craft-stat">
+      <span class="item-stat-label">⚒️ Could Craft</span>
+      <span class="could-craft-count ${cls}">${countNum}</span>
+    </div>`;
+  }
+
   return `
-    <div class="item-card ${rankClass}" data-id="${item.id}">
-      ${rankBadge}
+    <div class="item-card" data-id="${item.id}">
       <div class="item-card-header">
         <div class="item-card-name-wrap">
           <span class="item-card-icon">${item.icon||'📦'}</span>
@@ -194,7 +216,7 @@ function itemCardHtml(item, rank) {
         <div class="item-stat"><span class="item-stat-label">Payout</span><span class="item-stat-value large">${item.adds_to_payout!=null?'$'+item.adds_to_payout:'—'}</span></div>
         <div class="item-stat"><span class="item-stat-label">Cost</span><span class="item-stat-value">${item.cost_to_make?esc(item.cost_to_make):'—'}</span></div>
         <div class="item-stat"><span class="item-stat-label">Craft</span><span class="item-stat-value">${craftBadge}</span></div>
-        ${profitHtml}
+        ${couldCraftHtml}
         ${obtainHtml}
       </div>
       ${ingHtml}
@@ -499,6 +521,8 @@ async function setIngStock(id, qty, notes) {
     }
     updateDashboardStatIngStock();
     updateDashboardStatStock();
+    // Refresh craftable counts so Item Registry stays accurate
+    await refreshCraftableCounts();
   } catch(err) { toast('Failed to update','error'); }
 }
 

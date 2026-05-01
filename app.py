@@ -303,6 +303,34 @@ def get_categories():
     return jsonify([c[0] for c in cats])
 
 
+@app.route('/api/items/craftable_counts', methods=['GET'])
+def craftable_counts():
+    """Return how many of each craftable item could be made right now from ingredient stock."""
+    import re
+    ing_stock = {r.name: r.quantity for r in IngredientStock.query.all()}
+    result = {}
+    for item in Item.query.all():
+        if not item.can_craft or not item.ingredients:
+            result[item.id] = None   # not craftable
+            continue
+        min_craftable = None
+        for ing in item.ingredients:
+            # Parse quantity string like "x5", "x 2", "5", "1" → int
+            raw = str(ing.quantity or '1').lower().replace('x', '').strip()
+            try:
+                required = int(re.sub(r'[^0-9]', '', raw) or '1')
+            except Exception:
+                required = 1
+            if required < 1:
+                required = 1
+            available = ing_stock.get(ing.name, 0)
+            can_make = available // required
+            if min_craftable is None or can_make < min_craftable:
+                min_craftable = can_make
+        result[item.id] = min_craftable if min_craftable is not None else 0
+    return jsonify(result)
+
+
 # ── Ingredient Stock API ──────────────────────────────────────────────────────
 
 @app.route('/api/ingredient_stock', methods=['GET'])
