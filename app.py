@@ -17,10 +17,6 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sod-undertaker-slimm-br
 
 db = SQLAlchemy(app)
 
-# Auto-init DB on startup (works with gunicorn)
-with app.app_context():
-    pass  # will be called after models are defined
-
 # ─── Models ───────────────────────────────────────────────────────────────────
 
 class Item(db.Model):
@@ -393,6 +389,5 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
         seed_database()
-    import os
     port = int(os.environ.get('PORT', 5050))
     app.run(host='0.0.0.0', port=port, debug=False)
