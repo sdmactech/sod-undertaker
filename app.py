@@ -8,6 +8,9 @@ app = Flask(__name__)
 
 # Use DATABASE_URL env var if set (for production), else local SQLite
 DATABASE_URL = os.environ.get('DATABASE_URL', 'sqlite:///undertaker.db')
+# Railway gives postgres:// but SQLAlchemy requires postgresql://
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sod-undertaker-slimm-brinkman-2024')
