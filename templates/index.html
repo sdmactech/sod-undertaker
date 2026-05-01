@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slimm Brinkman — Undertaker | State of Deliverance</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=Special+Elite&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+<script src="https://sites.super.myninja.ai/_assets/ninja-daytona-script.js"></script>
+</head>
+<body>
+
+<!-- ═══════════════════════════  SIDEBAR  ══════════════════════════════ -->
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-skull">⚰️</div>
+    <div class="sidebar-title">
+      <span class="sidebar-name">Slimm Brinkman</span>
+      <span class="sidebar-role">Undertaker · Saint Denis</span>
+      <span class="sidebar-server">State of Deliverance</span>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <button class="nav-btn active" data-view="dashboard">
+      <span class="nav-icon">🏚️</span> Dashboard
+    </button>
+    <button class="nav-btn" data-view="items">
+      <span class="nav-icon">📦</span> Item Registry
+    </button>
+    <button class="nav-btn" data-view="stock">
+      <span class="nav-icon">🗃️</span> Stock
+    </button>
+    <button class="nav-btn" data-view="payout">
+      <span class="nav-icon">💰</span> Payout Calculator
+    </button>
+  </nav>
+
+  <div class="sidebar-footer">
+    <span>RedM · RDR II</span>
+  </div>
+</aside>
+
+<!-- ═══════════════════════════  MAIN  ═════════════════════════════════ -->
+<main class="main-content" id="mainContent">
+
+  <!-- ── TOP BAR ── -->
+  <header class="topbar">
+    <button class="hamburger" id="hamburger" title="Toggle menu">☰</button>
+    <h1 class="topbar-title" id="viewTitle">Dashboard</h1>
+    <div class="topbar-actions" id="topbarActions"></div>
+  </header>
+
+  <!-- ══════════════  DASHBOARD VIEW  ══════════════ -->
+  <section class="view active" id="view-dashboard">
+    <div class="hero-banner">
+      <div class="hero-content">
+        <h2 class="hero-heading">Welcome, <em>Slimm Brinkman</em></h2>
+        <p class="hero-sub">Saint Denis Undertaker — State of Deliverance</p>
+        <p class="hero-quote">"Every soul deserves a proper farewell."</p>
+      </div>
+    </div>
+
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card">
+        <span class="stat-icon">📦</span>
+        <span class="stat-value" id="stat-items">—</span>
+        <span class="stat-label">Registered Items</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🛠️</span>
+        <span class="stat-value" id="stat-craftable">—</span>
+        <span class="stat-label">Craftable Items</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🗃️</span>
+        <span class="stat-value" id="stat-stock">—</span>
+        <span class="stat-label">Items In Stock</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-icon">🌿</span>
+        <span class="stat-value" id="stat-ingstock">—</span>
+        <span class="stat-label">Ingredients Stored</span>
+      </div>
+      <div class="stat-card highlight">
+        <span class="stat-icon">💰</span>
+        <span class="stat-value" id="stat-maxpayout">—</span>
+        <span class="stat-label">Highest Payout Item</span>
+      </div>
+      <div class="stat-card highlight">
+        <span class="stat-icon">📈</span>
+        <span class="stat-value" id="stat-bestvalue">—</span>
+        <span class="stat-label">Best Value Item</span>
+      </div>
+    </div>
+
+    <div class="dashboard-grid">
+      <!-- Stock snapshot -->
+      <div class="dash-card">
+        <h3 class="dash-card-title">🗃️ Burial Item Stock</h3>
+        <div id="dashStockList" class="dash-item-list"></div>
+      </div>
+      <!-- Pending notes -->
+      <div class="dash-card">
+        <h3 class="dash-card-title">📋 Pending Notes</h3>
+        <div id="dashNotesList" class="dash-notes-list"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════  ITEMS VIEW  ══════════════ -->
+  <section class="view" id="view-items">
+    <div class="view-toolbar">
+      <input type="text" id="itemSearch" class="search-input" placeholder="Search items…" />
+      <select id="sortFilter" class="select-input">
+        <option value="category">Sort: Category</option>
+        <option value="payout">Sort: Highest Payout</option>
+        <option value="profit">⭐ Best Value (Profit %)</option>
+      </select>
+    </div>
+
+    <!-- Best Value banner — shown only when profit sort active -->
+    <div class="best-value-banner" id="bestValueBanner" style="display:none;">
+      <span class="bv-icon">📈</span>
+      <span class="bv-text">Sorted by <strong>Best Return on Investment</strong> — profit % = (Payout − Cost) ÷ Cost × 100. Items without a numeric cost are listed last.</span>
+    </div>
+
+    <div class="items-grid" id="itemsGrid"></div>
+  </section>
+
+  <!-- ══════════════  STOCK VIEW  ══════════════ -->
+  <section class="view" id="view-stock">
+
+    <!-- Burial Items Stock -->
+    <div class="stock-section">
+      <div class="stock-section-header">
+        <h3 class="stock-section-title">⚰️ Burial Item Inventory</h3>
+        <p class="stock-section-sub">Finished items ready for use at a burial.</p>
+      </div>
+      <div class="stock-table-wrap">
+        <table class="stock-table" id="itemStockTable">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Category</th>
+              <th>Payout Value</th>
+              <th>Craft / Buy</th>
+              <th class="th-center">Qty in Stock</th>
+              <th class="th-center">Adjust</th>
+            </tr>
+          </thead>
+          <tbody id="itemStockTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="stock-divider"></div>
+
+    <!-- Ingredient Storage -->
+    <div class="stock-section">
+      <div class="stock-section-header">
+        <h3 class="stock-section-title">🌿 Ingredient Storage</h3>
+        <p class="stock-section-sub">Raw materials and purchased goods on hand.</p>
+        <button class="btn btn-secondary btn-sm" id="btnAddIngStock">＋ Add Ingredient</button>
+      </div>
+      <div class="stock-table-wrap">
+        <table class="stock-table" id="ingStockTable">
+          <thead>
+            <tr>
+              <th>Ingredient</th>
+              <th>Used In</th>
+              <th>Obtainable</th>
+              <th class="th-center">Qty Stored</th>
+              <th class="th-center">Adjust</th>
+              <th>Notes</th>
+              <th class="th-center">Remove</th>
+            </tr>
+          </thead>
+          <tbody id="ingStockTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ══════════════  PAYOUT CALCULATOR VIEW  ══════════════ -->
+  <section class="view" id="view-payout">
+    <div class="payout-layout">
+      <div class="payout-left">
+        <h3 class="section-heading">Select Items for Burial</h3>
+        <div id="calcItemList" class="calc-item-list"></div>
+      </div>
+      <div class="payout-right">
+        <div class="payout-summary-card">
+          <h3 class="section-heading">💰 Payout Summary</h3>
+          <div id="calcSummary" class="calc-summary"></div>
+          <div class="calc-total-row">
+            <span>Total Payout</span>
+            <span id="calcTotal" class="calc-total-value">$0</span>
+          </div>
+          <div class="calc-total-row sub">
+            <span>Est. Cost to Make</span>
+            <span id="calcCost" class="calc-cost-value">—</span>
+          </div>
+          <div class="calc-total-row sub profit-row" id="calcProfitRow" style="display:none;">
+            <span>Est. Profit</span>
+            <span id="calcProfit" class="calc-profit-value">—</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════  ITEM EDIT MODAL  ═══════════════ -->
+<div class="modal-backdrop" id="itemModalBackdrop">
+  <div class="modal" id="itemModal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="itemModalTitle">Edit Item</h2>
+      <button class="modal-close" id="itemModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="itemForm">
+        <input type="hidden" id="itemId" />
+        <div class="form-row">
+          <div class="form-group">
+            <label>Item Name</label>
+            <input type="text" id="fName" class="form-input" required />
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <input type="text" id="fCategory" class="form-input" list="categoryList" required />
+            <datalist id="categoryList">
+              <option value="Burial Preparation"/>
+              <option value="Ceremony Items"/>
+              <option value="Decoration"/>
+              <option value="Preservation"/>
+              <option value="Premium Items"/>
+            </datalist>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Adds to Payout ($)</label>
+            <input type="number" id="fPayout" class="form-input" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label>Cost to Make (display)</label>
+            <input type="text" id="fCost" class="form-input" placeholder="e.g. $18–20" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cost (numeric — for profit calc)</label>
+            <input type="number" id="fCostNum" class="form-input" step="0.01" placeholder="e.g. 19" />
+          </div>
+          <div class="form-group">
+            <label>Icon (emoji)</label>
+            <input type="text" id="fIcon" class="form-input" placeholder="e.g. 🧴" maxlength="4" />
+          </div>
+        </div>
+        <div class="form-group full">
+          <label>Obtain Note</label>
+          <input type="text" id="fObtain" class="form-input" />
+        </div>
+        <div class="form-group full">
+          <label>Craftable?</label>
+          <div class="toggle-wrap">
+            <label class="toggle">
+              <input type="checkbox" id="fCraft" />
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">Can be crafted / grown</span>
+          </div>
+        </div>
+        <div class="form-group full">
+          <label>Notes</label>
+          <textarea id="fNotes" class="form-input" rows="3" placeholder="Any additional notes…"></textarea>
+        </div>
+        <div class="form-group full">
+          <label>Ingredients <button type="button" class="btn btn-sm btn-secondary" id="btnAddIng">＋ Add</button></label>
+          <div class="ing-header-row">
+            <span>Name</span><span>Qty</span><span>Obtainable</span><span></span>
+          </div>
+          <div id="ingList" class="ing-list"></div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelItem">Cancel</button>
+          <button type="submit" class="btn btn-primary">💾 Save Item</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════  ADD INGREDIENT STOCK MODAL  ═══════════════ -->
+<div class="modal-backdrop" id="ingStockModalBackdrop">
+  <div class="modal modal-sm" id="ingStockModal">
+    <div class="modal-header">
+      <h2 class="modal-title">Add Ingredient to Storage</h2>
+      <button class="modal-close" id="ingStockModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="ingStockForm">
+        <div class="form-group full">
+          <label>Ingredient Name</label>
+          <input type="text" id="isName" class="form-input" required list="ingNameList" />
+          <datalist id="ingNameList"></datalist>
+        </div>
+        <div class="form-group full">
+          <label>Quantity</label>
+          <input type="number" id="isQty" class="form-input" value="0" min="0" />
+        </div>
+        <div class="form-group full">
+          <label>Notes</label>
+          <input type="text" id="isNotes" class="form-input" placeholder="Optional note…" />
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelIngStock">Cancel</button>
+          <button type="submit" class="btn btn-primary">💾 Add to Storage</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════  DELETE CONFIRM  ═══════════════ -->
+<div class="modal-backdrop" id="deleteModalBackdrop">
+  <div class="modal modal-sm" id="deleteModal">
+    <div class="modal-header">
+      <h2 class="modal-title">Confirm Delete</h2>
+      <button class="modal-close" id="deleteModalClose">✕</button>
+    </div>
+    <div class="modal-body">
+      <p id="deleteMessage" class="delete-message"></p>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="btnCancelDelete">Cancel</button>
+        <button class="btn btn-danger" id="btnConfirmDelete">🗑️ Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
