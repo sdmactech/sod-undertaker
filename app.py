@@ -284,8 +284,14 @@ def update_item(item_id):
 def update_item_stock(item_id):
     item = Item.query.get_or_404(item_id)
     data = request.get_json()
-    item.in_stock  = max(0, data.get('in_stock', item.in_stock))
+    new_qty = max(0, data.get('in_stock', item.in_stock))
+    item.in_stock   = new_qty
     item.updated_at = datetime.utcnow()
+    # Sync ingredient stock if same name exists there
+    ing_row = IngredientStock.query.filter_by(name=item.name).first()
+    if ing_row:
+        ing_row.quantity   = new_qty
+        ing_row.updated_at = datetime.utcnow()
     db.session.commit()
     return jsonify(item.to_dict())
 
@@ -325,11 +331,24 @@ def create_ingredient_stock():
 def update_ingredient_stock(row_id):
     row = IngredientStock.query.get_or_404(row_id)
     data = request.get_json()
-    row.quantity   = max(0, data.get('quantity', row.quantity))
-    row.notes      = data.get('notes', row.notes)
+    if 'quantity' in data:
+        new_qty = max(0, data['quantity'])
+        row.quantity = new_qty
+        # Sync burial item stock if same name exists there
+        item = Item.query.filter_by(name=row.name).first()
+        if item:
+            item.in_stock   = new_qty
+            item.updated_at = datetime.utcnow()
+    if 'notes' in data:
+        row.notes = data['notes']
     row.updated_at = datetime.utcnow()
     db.session.commit()
-    return jsonify(row.to_dict())
+    # Return both updated objects so frontend can sync
+    result = row.to_dict()
+    item = Item.query.filter_by(name=row.name).first()
+    result['synced_item_id']    = item.id    if item else None
+    result['synced_item_stock'] = item.in_stock if item else None
+    return jsonify(result)
 
 
 @app.route('/api/ingredient_stock/<int:row_id>', methods=['DELETE'])

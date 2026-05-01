@@ -973,6 +973,32 @@ textarea.form-input { resize: vertical; line-height: 1.5; }
 .toast.success { border-color: var(--green); }
 .toast.error   { border-color: var(--blood); }
 
+/* ── Sync badge ──────────────────────────────────────────── */
+.synced-badge {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 99px;
+  background: rgba(58,107,58,0.15);
+  border: 1px solid var(--green);
+  color: var(--green-light);
+  vertical-align: middle;
+  margin-left: 4px;
+}
+.sync-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.85rem;
+  margin-left: 4px;
+  cursor: help;
+  opacity: 0.85;
+  vertical-align: middle;
+}
+.sync-tag:hover { opacity: 1; }
+
 /* Empty state */
 .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 20px; color: var(--text-muted); gap: 12px; grid-column: 1 / -1; text-align: center; }
 .empty-state .empty-icon { font-size: 3rem; opacity: 0.4; }

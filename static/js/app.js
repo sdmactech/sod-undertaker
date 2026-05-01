@@ -7,13 +7,15 @@
 const state = {
   items: [], ingStock: [],
   currentView: 'dashboard', deleteTarget: null,
+  sharedNames: new Set(), // item names that exist in both tables
 };
 
 /* ─── API ─── */
 async function api(method, path, body) {
+  const base = (typeof API_BASE !== 'undefined') ? API_BASE : '';
   const opts = { method, headers: { 'Content-Type': 'application/json' } };
   if (body !== undefined) opts.body = JSON.stringify(body);
-  const res = await fetch(path, opts);
+  const res = await fetch(base + path, opts);
   if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e.error||`HTTP ${res.status}`); }
   return res.json();
 }
@@ -36,6 +38,13 @@ function esc(s) {
   return String(s).replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"').replace(/'/g,'&#039;');
 }
 
+/* ─── Compute shared names ─── */
+function computeSharedNames() {
+  const itemNames = new Set(state.items.map(i => i.name));
+  const ingNames  = new Set(state.ingStock.map(r => r.name));
+  state.sharedNames = new Set([...itemNames].filter(n => ingNames.has(n)));
+}
+
 /* ─── Navigation ─── */
 function setView(name) {
   state.currentView = name;
@@ -56,6 +65,7 @@ async function loadAll() {
   const [items, ingStock] = await Promise.all([GET('/api/items'), GET('/api/ingredient_stock')]);
   state.items    = items;
   state.ingStock = ingStock;
+  computeSharedNames();
 }
 
 /* ════════════════════════════════════════════
@@ -74,7 +84,6 @@ async function renderDashboard() {
     bv.style.fontSize = '1rem';
   } catch(e) { console.error(e); }
 
-  /* Stock snapshot */
   const listEl = document.getElementById('dashStockList');
   if (!state.items.length) {
     listEl.innerHTML = `<p class="no-data">No items registered yet.</p>`;
@@ -91,7 +100,6 @@ async function renderDashboard() {
     }).join('');
   }
 
-  /* Pending notes */
   const notesEl = document.getElementById('dashNotesList');
   const withNotes = state.items.filter(i=>i.notes);
   notesEl.innerHTML = !withNotes.length
@@ -107,33 +115,24 @@ async function renderDashboard() {
    ITEMS
    ════════════════════════════════════════════ */
 async function renderItems() {
-  const search   = (document.getElementById('itemSearch').value||'').toLowerCase();
-  const sortVal  = document.getElementById('sortFilter').value;
-
-  /* Show/hide best value banner */
+  const search  = (document.getElementById('itemSearch').value||'').toLowerCase();
+  const sortVal = document.getElementById('sortFilter').value;
   document.getElementById('bestValueBanner').style.display = sortVal==='profit' ? 'flex' : 'none';
-
-  /* Fetch sorted from server */
   let items;
   try { items = await GET(`/api/items?sort=${sortVal}`); } catch(e) { items = state.items; }
-
-  /* Filter by search */
   const filtered = items.filter(item =>
     !search ||
     item.name.toLowerCase().includes(search) ||
     (item.category||'').toLowerCase().includes(search) ||
     (item.notes||'').toLowerCase().includes(search)
   );
-
   const grid = document.getElementById('itemsGrid');
   if (!filtered.length) {
     grid.innerHTML = `<div class="empty-state"><span class="empty-icon">⚰️</span><p>No items found.</p></div>`;
     return;
   }
-
   grid.innerHTML = filtered.map((item, idx) => itemCardHtml(item, sortVal==='profit' ? idx : null)).join('');
 
-  /* Stock buttons */
   grid.querySelectorAll('.stock-btn').forEach(btn => {
     btn.addEventListener('click', async e => {
       const id    = parseInt(e.target.closest('.item-card').dataset.id);
@@ -143,12 +142,18 @@ async function renderItems() {
       try {
         const updated = await PATCH(`/api/items/${id}/stock`, { in_stock: Math.max(0, item.in_stock+delta) });
         item.in_stock = updated.in_stock;
+        // Update item card count
         e.target.closest('.item-card').querySelector('.stock-count').textContent = updated.in_stock;
+        // If shared, sync ingredient stock table & state
+        if (state.sharedNames.has(item.name)) {
+          syncIngStockRowByName(item.name, updated.in_stock);
+          toast(`🔄 Synced stock for "${item.name}"`, 'success');
+        }
+        updateDashboardStatStock();
       } catch(err) { toast('Failed to update stock','error'); }
     });
   });
 
-  /* Edit */
   grid.querySelectorAll('.btn-edit-item').forEach(btn => {
     btn.addEventListener('click', () => openItemModal(parseInt(btn.dataset.id)));
   });
@@ -169,6 +174,8 @@ function itemCardHtml(item, rank) {
   const rankClass = rank===0?'rank-1':rank===1?'rank-2':rank===2?'rank-3':'';
   const rankBadge = rank!=null&&rank<3 ? `<div class="rank-badge">${['🥇','🥈','🥉'][rank]} #${rank+1} ROI</div>` : '';
   const profitHtml= `<div class="item-stat"><span class="item-stat-label">Profit ROI</span><span class="item-stat-value">${profitBadgeHtml(item.profit_pct)}</span></div>`;
+  const syncedBadge = state.sharedNames.has(item.name)
+    ? `<span class="synced-badge" title="Stock is synced with Ingredient Storage">🔄 Synced</span>` : '';
 
   return `
     <div class="item-card ${rankClass}" data-id="${item.id}">
@@ -177,7 +184,7 @@ function itemCardHtml(item, rank) {
         <div class="item-card-name-wrap">
           <span class="item-card-icon">${item.icon||'📦'}</span>
           <div>
-            <div class="item-card-name">${esc(item.name)}</div>
+            <div class="item-card-name">${esc(item.name)} ${syncedBadge}</div>
             <div class="item-card-category">${esc(item.category||'')}</div>
           </div>
         </div>
@@ -205,10 +212,9 @@ function itemCardHtml(item, rank) {
     </div>`;
 }
 
-/* ── Item Modal (edit only) ── */
+/* ── Item Modal ── */
 function openItemModal(id) {
-  const item = state.items.find(i=>i.id===id);
-  if (!item) return;
+  const item = state.items.find(i=>i.id===id); if (!item) return;
   document.getElementById('itemModalTitle').textContent = 'Edit Item';
   document.getElementById('itemId').value    = item.id;
   document.getElementById('fName').value     = item.name;
@@ -242,8 +248,7 @@ function addIngRow(ing={}) {
 
 async function saveItem(e) {
   e.preventDefault();
-  const id = document.getElementById('itemId').value;
-  if (!id) return;
+  const id = document.getElementById('itemId').value; if (!id) return;
   const ingredients=[];
   document.querySelectorAll('#ingList .ing-row').forEach(row=>{
     const name=row.querySelector('.ing-name').value.trim();
@@ -267,6 +272,7 @@ async function saveItem(e) {
     const updated = await PUT(`/api/items/${id}`, body);
     const idx = state.items.findIndex(i=>i.id===parseInt(id));
     if (idx!==-1) state.items[idx]=updated;
+    computeSharedNames();
     toast('✅ Item updated');
     closeItemModal();
     renderItems();
@@ -295,9 +301,11 @@ function renderItemStockTable() {
     const craftBadge = item.can_craft
       ? `<span class="craft-badge yes" style="font-size:0.68rem;">🛠️ Craftable</span>`
       : `<span class="craft-badge no"  style="font-size:0.68rem;">🛒 Purchase</span>`;
+    const isShared = state.sharedNames.has(item.name);
+    const sharedTag = isShared ? `<span class="sync-tag" title="Synced with Ingredient Storage">🔄</span>` : '';
     return `
       <tr data-item-id="${item.id}">
-        <td><div class="stock-item-name">${item.icon||'📦'} ${esc(item.name)}</div></td>
+        <td><div class="stock-item-name">${item.icon||'📦'} ${esc(item.name)} ${sharedTag}</div></td>
         <td style="color:var(--cream-faint);font-size:0.82rem;">${esc(item.category||'')}</td>
         <td style="font-family:var(--font-heading);color:var(--gold);">${item.adds_to_payout!=null?'$'+item.adds_to_payout:'—'}</td>
         <td>${craftBadge}</td>
@@ -312,7 +320,6 @@ function renderItemStockTable() {
       </tr>`;
   }).join('');
 
-  /* +/- buttons */
   tbody.querySelectorAll('.stock-adj-btn').forEach(btn=>{
     btn.addEventListener('click', async()=>{
       const id    = parseInt(btn.dataset.id);
@@ -320,7 +327,6 @@ function renderItemStockTable() {
       await adjustItemStock(id, delta);
     });
   });
-  /* Direct input */
   tbody.querySelectorAll('.stock-qty-input').forEach(inp=>{
     inp.addEventListener('change', async()=>{
       const id  = parseInt(inp.dataset.id);
@@ -331,6 +337,10 @@ function renderItemStockTable() {
         item.in_stock = updated.in_stock;
         syncItemStockRow(id, updated.in_stock);
         inp.value = updated.in_stock;
+        if (state.sharedNames.has(item.name)) {
+          syncIngStockRowByName(item.name, updated.in_stock);
+          toast(`🔄 "${item.name}" synced across both tables`);
+        }
       } catch(err){ toast('Failed to update','error'); }
     });
   });
@@ -342,9 +352,11 @@ async function adjustItemStock(id, delta) {
     const updated = await PATCH(`/api/items/${id}/stock`,{ in_stock: Math.max(0, item.in_stock+delta) });
     item.in_stock = updated.in_stock;
     syncItemStockRow(id, updated.in_stock);
-    // also sync items grid if visible
-    const gridCard = document.querySelector(`.item-card[data-id="${id}"] .stock-count`);
-    if (gridCard) gridCard.textContent = updated.in_stock;
+    if (state.sharedNames.has(item.name)) {
+      syncIngStockRowByName(item.name, updated.in_stock);
+      toast(`🔄 "${item.name}" synced across both tables`);
+    }
+    updateDashboardStatStock();
   } catch(err){ toast('Failed to update','error'); }
 }
 
@@ -353,17 +365,39 @@ function syncItemStockRow(id, qty) {
   if (qtyCell) { qtyCell.textContent = qty; qtyCell.className = `stock-qty-cell ${qty===0?'zero':''}`; }
   const inp = document.querySelector(`.stock-qty-input[data-id="${id}"]`);
   if (inp) inp.value = qty;
-  // dashboard
-  renderDashboardStockCount(id, qty);
+  // sync item card on items view too
+  const cardCount = document.querySelector(`.item-card[data-id="${id}"] .stock-count`);
+  if (cardCount) cardCount.textContent = qty;
 }
 
-function renderDashboardStockCount(id, qty) {
-  // find the stat cards and update quickly
-  const statEl = document.getElementById('stat-stock');
-  if (statEl) {
-    const total = state.items.reduce((s,i)=>s+i.in_stock, 0);
-    statEl.textContent = total;
-  }
+/* Sync ingredient stock row in the DOM by ingredient name */
+function syncIngStockRowByName(name, qty) {
+  const row = state.ingStock.find(r=>r.name===name);
+  if (!row) return;
+  row.quantity = qty;
+  const qtyCell = document.getElementById(`isqty_${row.id}`);
+  if (qtyCell) { qtyCell.textContent = qty; qtyCell.className = `stock-qty-cell ${qty===0?'zero':''}`; }
+  const inp = document.querySelector(`.stock-qty-input[data-id="${row.id}"][data-type="ing"]`);
+  if (inp) inp.value = qty;
+  updateDashboardStatIngStock();
+}
+
+/* Sync item stock row in the DOM by item name */
+function syncItemStockRowByName(name, qty) {
+  const item = state.items.find(i=>i.name===name);
+  if (!item) return;
+  item.in_stock = qty;
+  syncItemStockRow(item.id, qty);
+  updateDashboardStatStock();
+}
+
+function updateDashboardStatStock() {
+  const el = document.getElementById('stat-stock');
+  if (el) el.textContent = state.items.reduce((s,i)=>s+i.in_stock,0);
+}
+function updateDashboardStatIngStock() {
+  const el = document.getElementById('stat-ingstock');
+  if (el) el.textContent = state.ingStock.reduce((s,r)=>s+r.quantity,0);
 }
 
 /* ── Ingredient Stock Table ── */
@@ -373,8 +407,6 @@ function renderIngStockTable() {
     tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-muted);font-style:italic;">No ingredients tracked yet.</td></tr>`;
     return;
   }
-
-  /* Build a lookup: ingredient name → which items use it + obtainable status */
   const usedInMap = {};
   state.items.forEach(item=>{
     (item.ingredients||[]).forEach(ing=>{
@@ -389,9 +421,11 @@ function renderIngStockTable() {
     const obCls  = info.obtainable==='No' ? 'no' : 'yes';
     const obText = info.obtainable==='No' ? '🛒 Buy' : '✅ Gather';
     const usedIn = info.items.length ? info.items.join(', ') : '—';
+    const isShared = state.sharedNames.has(row.name);
+    const sharedTag = isShared ? `<span class="sync-tag" title="Synced with Burial Item Inventory">🔄</span>` : '';
     return `
       <tr data-ing-id="${row.id}">
-        <td style="font-family:var(--font-heading);font-size:0.88rem;color:var(--cream);">🌿 ${esc(row.name)}</td>
+        <td style="font-family:var(--font-heading);font-size:0.88rem;color:var(--cream);">🌿 ${esc(row.name)} ${sharedTag}</td>
         <td class="used-in-cell">${esc(usedIn)}</td>
         <td><span class="obtainable-badge ${obCls}">${obText}</span></td>
         <td class="stock-qty-cell ${row.quantity===0?'zero':''}" id="isqty_${row.id}">${row.quantity}</td>
@@ -407,7 +441,6 @@ function renderIngStockTable() {
       </tr>`;
   }).join('');
 
-  /* +/- */
   tbody.querySelectorAll('.ing-adj-btn').forEach(btn=>{
     btn.addEventListener('click', async()=>{
       const id    = parseInt(btn.dataset.id);
@@ -416,7 +449,6 @@ function renderIngStockTable() {
     });
   });
 
-  /* Direct input */
   tbody.querySelectorAll('.stock-qty-input[data-type="ing"]').forEach(inp=>{
     inp.addEventListener('change', async()=>{
       const id  = parseInt(inp.dataset.id);
@@ -425,7 +457,6 @@ function renderIngStockTable() {
     });
   });
 
-  /* Note input save on blur */
   tbody.querySelectorAll('.stock-note-input').forEach(inp=>{
     inp.addEventListener('blur', async()=>{
       const id = parseInt(inp.dataset.id);
@@ -433,7 +464,6 @@ function renderIngStockTable() {
     });
   });
 
-  /* Remove */
   tbody.querySelectorAll('.btn-remove-ing-stock').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       confirmDelete('ingstock', parseInt(btn.dataset.id), `Remove this ingredient from storage tracking?`);
@@ -443,8 +473,7 @@ function renderIngStockTable() {
 
 async function adjustIngStock(id, delta) {
   const row = state.ingStock.find(r=>r.id===id); if(!row) return;
-  const newQty = Math.max(0, row.quantity+delta);
-  await setIngStock(id, newQty, null);
+  await setIngStock(id, Math.max(0, row.quantity+delta), null);
 }
 
 async function setIngStock(id, qty, notes) {
@@ -456,13 +485,22 @@ async function setIngStock(id, qty, notes) {
     const updated = await PATCH(`/api/ingredient_stock/${id}`, body);
     row.quantity = updated.quantity;
     row.notes    = updated.notes;
+    // Update ingredient row in DOM
     const qtyCell = document.getElementById(`isqty_${id}`);
     if (qtyCell) { qtyCell.textContent=updated.quantity; qtyCell.className=`stock-qty-cell ${updated.quantity===0?'zero':''}`; }
     const inp = document.querySelector(`.stock-qty-input[data-id="${id}"][data-type="ing"]`);
     if (inp) inp.value = updated.quantity;
-    // update dashboard ing count
-    const statEl = document.getElementById('stat-ingstock');
-    if (statEl) statEl.textContent = state.ingStock.reduce((s,r)=>s+r.quantity,0);
+    // If backend synced a burial item, update that row too
+    if (updated.synced_item_id !== null && updated.synced_item_id !== undefined) {
+      const syncedItem = state.items.find(i=>i.id===updated.synced_item_id);
+      if (syncedItem) {
+        syncedItem.in_stock = updated.synced_item_stock;
+        syncItemStockRow(updated.synced_item_id, updated.synced_item_stock);
+        toast(`🔄 "${row.name}" synced across both tables`);
+      }
+    }
+    updateDashboardStatIngStock();
+    updateDashboardStatStock();
   } catch(err) { toast('Failed to update','error'); }
 }
 
@@ -471,7 +509,6 @@ function openIngStockModal() {
   document.getElementById('isName').value = '';
   document.getElementById('isQty').value  = '0';
   document.getElementById('isNotes').value= '';
-  /* populate datalist with known ingredient names */
   const dl = document.getElementById('ingNameList');
   const known = new Set(state.ingStock.map(r=>r.name));
   const allIng = new Set();
@@ -483,14 +520,14 @@ function openIngStockModal() {
 
 async function saveIngStock(e) {
   e.preventDefault();
-  const name = document.getElementById('isName').value.trim();
-  if (!name) return;
+  const name = document.getElementById('isName').value.trim(); if (!name) return;
   const body = { name, quantity: parseInt(document.getElementById('isQty').value)||0, notes: document.getElementById('isNotes').value.trim()||null };
   try {
     const created = await POST('/api/ingredient_stock', body);
     const existing = state.ingStock.findIndex(r=>r.id===created.id);
     if (existing!==-1) state.ingStock[existing]=created; else state.ingStock.push(created);
     state.ingStock.sort((a,b)=>a.name.localeCompare(b.name));
+    computeSharedNames();
     toast('✅ Ingredient added to storage');
     closeIngStockModal();
     renderIngStockTable();
@@ -554,9 +591,7 @@ function updateCalculator() {
       profitEl.textContent = `$${profit.toFixed(0)} (${totalCost>0?Math.round((profit/totalCost)*100):0}% ROI)`;
       profitEl.style.color = profit>=0 ? 'var(--green-light)' : '#d46060';
       profitRow.style.display='flex';
-    } else {
-      costEl.textContent='—'; profitRow.style.display='none';
-    }
+    } else { costEl.textContent='—'; profitRow.style.display='none'; }
   }
 }
 
@@ -575,6 +610,7 @@ async function executeDelete() {
     if (type==='ingstock') {
       await DEL(`/api/ingredient_stock/${id}`);
       state.ingStock = state.ingStock.filter(r=>r.id!==id);
+      computeSharedNames();
       toast('🗑️ Ingredient removed'); renderIngStockTable();
     }
   } catch(err){ toast(`❌ ${err.message}`,'error'); }
@@ -588,24 +624,19 @@ function closeDeleteModal() { document.getElementById('deleteModalBackdrop').cla
    ════════════════════════════════════════════ */
 document.querySelectorAll('.nav-btn').forEach(btn=>btn.addEventListener('click',()=>setView(btn.dataset.view)));
 document.getElementById('hamburger').addEventListener('click',()=>document.getElementById('sidebar').classList.toggle('open'));
-
 document.getElementById('itemSearch').addEventListener('input', renderItems);
 document.getElementById('sortFilter').addEventListener('change', renderItems);
-
 document.getElementById('itemForm').addEventListener('submit', saveItem);
 document.getElementById('itemModalClose').addEventListener('click', closeItemModal);
 document.getElementById('btnCancelItem').addEventListener('click', closeItemModal);
 document.getElementById('btnAddIng').addEventListener('click', ()=>addIngRow());
-
 document.getElementById('btnAddIngStock').addEventListener('click', openIngStockModal);
 document.getElementById('ingStockForm').addEventListener('submit', saveIngStock);
 document.getElementById('ingStockModalClose').addEventListener('click', closeIngStockModal);
 document.getElementById('btnCancelIngStock').addEventListener('click', closeIngStockModal);
-
 document.getElementById('btnConfirmDelete').addEventListener('click', executeDelete);
 document.getElementById('btnCancelDelete').addEventListener('click', closeDeleteModal);
 document.getElementById('deleteModalClose').addEventListener('click', closeDeleteModal);
-
 ['itemModalBackdrop','ingStockModalBackdrop','deleteModalBackdrop'].forEach(id=>{
   document.getElementById(id).addEventListener('click', e=>{
     if (e.target.id===id) {
@@ -615,7 +646,6 @@ document.getElementById('deleteModalClose').addEventListener('click', closeDelet
     }
   });
 });
-
 document.addEventListener('keydown', e=>{
   if (e.key==='Escape') { closeItemModal(); closeIngStockModal(); closeDeleteModal(); }
 });
