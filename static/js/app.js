@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════
    THE UNDERTAKER'S LEDGER — v2
-   Slimm Brinkman · Saint Denis · State of Deliverance
+   Helix “Ghost” Solus · Saint Denis · State of Deliverance
    Same API as v1. Motion is spring-driven so every animation
    starts from what is on screen and can be grabbed mid-flight.
    ═══════════════════════════════════════════════════════ */
