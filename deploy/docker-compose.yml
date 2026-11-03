@@ -1,0 +1,17 @@
+# SoD Undertaker on MFV. Code is pushed to ./app (v1) by bin/deploy-nas.sh; SQLite lives in ./data.
+services:
+  sod-undertaker:
+    build: ./app
+    image: sod-undertaker:v1
+    container_name: sod-undertaker
+    restart: unless-stopped
+    ports:
+      - "8094:5050"
+    env_file: .env
+    environment:
+      DATABASE_URL: sqlite:////data/undertaker.db
+    volumes:
+      - ./data/v1:/data
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }

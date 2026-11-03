@@ -1,0 +1,7 @@
+.git
+*.db
+instance/
+__pycache__/
+deploy/
+bin/
+*.md
