@@ -7,7 +7,7 @@ BRANCH=${1:-main}
 SLOT=${2:-app}
 STACK=/volume1/docker/sod-undertaker
 cd "$(dirname "$0")/.."
-ssh mfv "mkdir -p $STACK/data && rm -rf $STACK/$SLOT.new && mkdir -p $STACK/$SLOT.new"
+ssh mfv "mkdir -p $STACK/data/v1 $STACK/data/v2 && rm -rf $STACK/$SLOT.new && mkdir -p $STACK/$SLOT.new"
 git archive "$BRANCH" | ssh mfv "tar -x -C $STACK/$SLOT.new"
 ssh mfv "cat > $STACK/docker-compose.yml" < deploy/docker-compose.yml
 ssh mfv "cd $STACK && rm -rf $SLOT.old && { [ -d $SLOT ] && mv $SLOT $SLOT.old || true; } && mv $SLOT.new $SLOT && rm -rf $SLOT.old
