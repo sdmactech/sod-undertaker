@@ -13,4 +13,5 @@ ssh mfv "cat > $STACK/docker-compose.yml" < deploy/docker-compose.yml
 ssh mfv "cd $STACK && rm -rf $SLOT.old && { [ -d $SLOT ] && mv $SLOT $SLOT.old || true; } && mv $SLOT.new $SLOT && rm -rf $SLOT.old
   [ -f .env ] || { umask 077; printf 'SECRET_KEY=%s\n' \"\$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')\" > .env; }
   ls -la"
-echo "Staged $BRANCH -> $STACK/$SLOT. Now on the NAS: cd $STACK && sudo docker-compose up -d --build"
+echo "Staged $BRANCH -> $STACK/$SLOT. Start it on the NAS (asks for the MFVadmin password):"
+echo "  ssh -t mfv 'cd $STACK && sudo env DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 /usr/local/bin/docker-compose up -d --build'"

@@ -1,17 +1,33 @@
-# SoD Undertaker on MFV. Code is pushed to ./app (v1) by bin/deploy-nas.sh; SQLite lives in ./data.
+# SoD Undertaker on MFV. bin/deploy-nas.sh pushes a branch into ./app (v1, main) or ./app-v2 (v2).
+# Each version keeps its own SQLite database under ./data.
+# Synology's kernel has no seccomp, so build with the legacy builder:
+#   sudo env DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 /usr/local/bin/docker-compose up -d --build
+x-common: &common
+  restart: unless-stopped
+  env_file: .env
+  environment:
+    DATABASE_URL: sqlite:////data/undertaker.db
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
 services:
   sod-undertaker:
+    <<: *common
     build: ./app
     image: sod-undertaker:v1
     container_name: sod-undertaker
-    restart: unless-stopped
     ports:
       - "8094:5050"
-    env_file: .env
-    environment:
-      DATABASE_URL: sqlite:////data/undertaker.db
     volumes:
       - ./data/v1:/data
-    logging:
-      driver: json-file
-      options: { max-size: "10m", max-file: "3" }
+
+  sod-undertaker-v2:
+    <<: *common
+    build: ./app-v2
+    image: sod-undertaker:v2
+    container_name: sod-undertaker-v2
+    ports:
+      - "8095:5050"
+    volumes:
+      - ./data/v2:/data
