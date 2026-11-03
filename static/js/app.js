@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   SLIMM BRINKMAN — UNDERTAKER DATABASE
+   HELIX “GHOST” SOLUS — UNDERTAKER DATABASE
    State of Deliverance · RedM · RDR II
    ═══════════════════════════════════════════════════════ */
 'use strict';

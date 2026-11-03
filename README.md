@@ -1,5 +1,5 @@
 # ⚰️ SoD Undertaker Database
-### Slimm Brinkman — Saint Denis Undertaker
+### Helix “Ghost” Solus — Saint Denis Undertaker
 **State of Deliverance · RedM · Red Dead Redemption II**
 
 ---
