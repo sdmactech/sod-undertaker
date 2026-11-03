@@ -1,12 +1,13 @@
-# SoD Undertaker on MFV. bin/deploy-nas.sh pushes a branch into ./app (v1, main) or ./app-v2 (v2).
-# Each version keeps its own SQLite database under ./data.
-# Synology's kernel has no seccomp, so build with the legacy builder:
-#   sudo env DOCKER_BUILDKIT=0 COMPOSE_DOCKER_CLI_BUILD=0 /usr/local/bin/docker-compose up -d --build
+# SoD Undertaker on MFV. bin/deploy-nas.sh pushes a branch into ./app (v1, main) or ./app-v2 (v2)
+# and installs its Python packages into <slot>/.deps. No image is built: DSM's kernel has no
+# seccomp, so build RUN steps fail, and running the stock image keeps every step on the
+# passwordless `sudo docker` / `sudo docker-compose` the NAS already allows.
 x-common: &common
+  image: python:3.12-slim
   restart: unless-stopped
+  working_dir: /app
   env_file: .env
-  environment:
-    DATABASE_URL: sqlite:////data/undertaker.db
+  command: ["python", "-m", "gunicorn", "--bind", "0.0.0.0:5050", "--workers", "1", "--threads", "4", "wsgi:app"]
   logging:
     driver: json-file
     options: { max-size: "10m", max-file: "3" }
@@ -14,20 +15,24 @@ x-common: &common
 services:
   sod-undertaker:
     <<: *common
-    build: ./app
-    image: sod-undertaker:v1
     container_name: sod-undertaker
     ports:
       - "8094:5050"
+    environment:
+      DATABASE_URL: sqlite:////data/undertaker.db
+      PYTHONPATH: /app/.deps
     volumes:
+      - ./app:/app:ro
       - ./data/v1:/data
 
   sod-undertaker-v2:
     <<: *common
-    build: ./app-v2
-    image: sod-undertaker:v2
     container_name: sod-undertaker-v2
     ports:
       - "8095:5050"
+    environment:
+      DATABASE_URL: sqlite:////data/undertaker.db
+      PYTHONPATH: /app/.deps
     volumes:
+      - ./app-v2:/app:ro
       - ./data/v2:/data
