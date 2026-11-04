@@ -57,7 +57,7 @@ async function setMode(mode, { save = true } = {}) {
 /* ═══════════════ SOUND ═══════════════ */
 const sound = (() => {
   const files = { creak: 'creak', flame: 'flame', coin: 'coin', seal: 'seal', bell: 'bell' };
-  const gain = { creak: .8, flame: .35, coin: .55, seal: .7, bell: .5 };
+  const gain = { creak: .9, flame: .45, coin: .7, seal: .85, bell: .9 };
   let ctx = null, master = null, flameSrc = null, flameGain = null;
   const buffers = {};
   let on = false, unlocked = false;
@@ -101,7 +101,7 @@ const sound = (() => {
     on = enabled;
     root.dataset.sound = on ? 'on' : 'off';
     if (save) store.set('sound', on ? 'on' : 'off');
-    if (on) { await ensureCtx(); flame(true); play('bell', { vol: .6 }); $('.masthead')?.classList.add('toll'); setTimeout(() => $('.masthead')?.classList.remove('toll'), 1700); }
+    if (on) { await ensureCtx(); flame(true); play('bell'); $('.masthead')?.classList.add('toll'); setTimeout(() => $('.masthead')?.classList.remove('toll'), 1700); }
     else flame(false);
     $('#fxSound')?.setAttribute('aria-pressed', on && unlocked);
   }
