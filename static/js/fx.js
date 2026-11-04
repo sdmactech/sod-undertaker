@@ -10,6 +10,7 @@
 'use strict';
 
 const root = document.documentElement;
+const V = new URL(import.meta.url).searchParams.get('v') || '';
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)');
@@ -69,7 +70,7 @@ const sound = (() => {
   }
   async function load(name) {
     if (buffers[name]) return buffers[name];
-    const res = await fetch(`/static/audio/${files[name]}.mp3`);
+    const res = await fetch(`/static/audio/${files[name]}.mp3?v=${V}`);
     if (!res.ok) throw new Error(`no audio ${name}`);
     const data = await res.arrayBuffer();
     buffers[name] = await ctx.decodeAudioData(data);
@@ -271,6 +272,8 @@ markLow(); stagger();
 
 setMode(store.get('fx', 'light'), { save: false });
 if (store.get('sound', 'off') === 'on') {
-  // the browser needs a gesture before sound; arm it on the first pointer press
-  window.addEventListener('pointerdown', () => sound.set(true, { save: false }), { once: true });
+  // the browser needs a gesture before sound; arm it on the first pointer press anywhere
+  // except the speaker button itself, whose click already decides
+  const arm = e => { if (e.target.closest && e.target.closest('#fxSound')) return; window.removeEventListener('pointerdown', arm); sound.set(true, { save: false }); };
+  window.addEventListener('pointerdown', arm);
 }
