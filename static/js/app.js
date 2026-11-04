@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   THE UNDERTAKER'S LEDGER — v3 (charter ledger look)
+   THE UNDERTAKER'S LEDGER — v4 (charter ledger look + effects layer in fx.js)
    Helix “Ghost” Solus · Saint Denis · State of Deliverance
    Same API as v1. Motion is spring-driven so every animation
    starts from what is on screen and can be grabbed mid-flight.
@@ -181,6 +181,7 @@ function setView(name, { push = true } = {}) {
   render();
   window.scrollTo({ top: 0 });
   if (name === 'items') requestAnimationFrame(() => placeThumb(false));
+  document.dispatchEvent(new CustomEvent('ledger:view', { detail: { name } }));
 }
 
 function render() {
@@ -404,6 +405,7 @@ function updateBill() {
   }
   $('#billClear').disabled = !picked.length;
   sectionMeta();
+  document.dispatchEvent(new CustomEvent('ledger:bill', { detail: { total, picked: picked.length } }));
 }
 
 /* ═══════════════════════════════════════════
@@ -677,6 +679,7 @@ document.addEventListener('click', e => {
     const st = step.closest('.stepper'), kind = st.dataset.kind, id = +st.dataset.id;
     const cur = kind === 'item' ? itemById(id).in_stock : ingById(id).quantity;
     setQty(kind, id, cur + Number(step.dataset.d));
+    document.dispatchEvent(new CustomEvent('ledger:qty', { detail: { kind, id, delta: Number(step.dataset.d), at: step } }));
     return;
   }
   const go = e.target.closest('[data-goto]');

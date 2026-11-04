@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-fx="light" data-sound="off">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -9,6 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/style.css" />
+  <link rel="stylesheet" href="/static/css/fx.css" />
+  <script>try{var m=localStorage.getItem('fx');if(m==='full'&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.dataset.fx='full';}catch(e){}</script>
 </head>
 <body>
 
@@ -33,6 +35,9 @@
   <symbol id="i-scroll" viewBox="0 0 24 24"><path d="M7 4h11a2 2 0 0 1 2 2v1h-4M7 4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V7"/><path d="M9 9h6M9 12.5h6M9 16h4"/></symbol>
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.3"/></symbol>
   <symbol id="i-skull" viewBox="0 0 24 24"><path d="M12 3a7.5 7.5 0 0 0-4.5 13.5V20h9v-3.5A7.5 7.5 0 0 0 12 3z"/><circle cx="9.3" cy="11" r="1.6"/><circle cx="14.7" cy="11" r="1.6"/><path d="M10.5 20v-2.2M13.5 20v-2.2"/></symbol>
+  <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 3l8 4.5v9L12 21l-8-4.5v-9z"/><path d="M4 7.5l8 4.5 8-4.5M12 12v9"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 10v4h3l5 4V6L7 10z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></symbol>
+  <symbol id="i-seal" viewBox="0 0 24 24"><circle cx="12" cy="13" r="6.5"/><path d="M9 4h6l-1 3h-4zM12 10.5v5M9.8 13h4.4"/></symbol>
   <symbol id="i-sack" viewBox="0 0 24 24"><path d="M9 3h6l-1.5 3.5h-3z"/><path d="M10.5 6.5C6 8.5 4 12.5 4 15.5 4 19 7 21 12 21s8-2 8-5.5c0-3-2-7-6.5-9"/><path d="M12 11v6M10 12.5c0-.8.9-1.3 2-1.3s2 .5 2 1.3-.9 1.2-2 1.3-2 .5-2 1.3.9 1.2 2 1.2 2-.4 2-1.2"/></symbol>
 </svg>
 
@@ -53,9 +58,40 @@
       <button class="nav-btn" data-view="stock"><svg><use href="#i-stock"/></svg><span>Stock room</span></button>
       <button class="nav-btn" data-view="payout"><svg><use href="#i-scales"/></svg><span>Burial payout</span></button>
     </nav>
+    <div class="fx-controls">
+      <button class="fx-toggle" id="fxMode" aria-pressed="false" title="Switch between the light effects and the full 3D stage"><svg><use href="#i-cube"/></svg><span class="lbl-off">Light</span><span class="lbl-on">Full 3D</span></button>
+      <button class="fx-toggle" id="fxSound" aria-pressed="false" title="Sound: coffin creaks, candles, coins and the seal"><svg><use href="#i-sound"/></svg><span class="lbl-off">Muted</span><span class="lbl-on">Sound</span></button>
+    </div>
   </header>
 
-  <!-- ─── Organization banner ─── -->
+  <!-- ─── Hero: the parlour table ─── -->
+  <section class="hero" aria-label="The parlour">
+    <div class="stage stage-css" aria-hidden="true">
+      <div class="candle-css l"><span class="glow"></span></div>
+      <div class="candle-css r"><span class="glow"></span></div>
+      <div class="casket-css" title="The casket">
+        <div class="c3">
+          <div class="c-shadow"></div>
+          <div class="c-body">
+            <svg viewBox="0 0 200 100" preserveAspectRatio="none"><polygon points="12,50 40,8 150,2 198,50 150,98 40,92"/></svg>
+            <svg class="handle" viewBox="0 0 200 100" preserveAspectRatio="none"><circle cx="60" cy="18" r="4"/><circle cx="110" cy="12" r="4"/><circle cx="60" cy="82" r="4"/><circle cx="110" cy="88" r="4"/></svg>
+          </div>
+          <div class="c-inner">
+            <svg viewBox="0 0 200 100" preserveAspectRatio="none"><polygon points="22,50 46,16 146,10 186,50 146,90 46,84"/>
+              <g class="skull" transform="translate(150 50)"><ellipse rx="13" ry="12" cy="-3"/><rect x="-9" y="5" width="18" height="9" rx="2"/><circle cx="-5" cy="-4" r="3" fill="#230a0c"/><circle cx="5" cy="-4" r="3" fill="#230a0c"/><path d="M-1 1l1 3 1-3z" fill="#230a0c"/></g>
+            </svg>
+          </div>
+          <div class="c-lid">
+            <svg viewBox="0 0 200 100" preserveAspectRatio="none"><defs><linearGradient id="lidWood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a3119"/><stop offset=".45" stop-color="#2e1d10"/><stop offset="1" stop-color="#1c1109"/></linearGradient></defs><polygon class="edge" points="12,52 40,10 150,4 198,52 150,100 40,94"/><polygon points="12,50 40,8 150,2 198,50 150,98 40,92"/>
+              <g class="cross"><rect x="60" y="46" width="90" height="8" rx="1"/><rect x="86" y="30" width="8" height="40" rx="1"/></g>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="stage stage-3d" id="stage3d" aria-hidden="true"><canvas></canvas><div class="veil">Lighting the parlour</div></div>
+    <div class="fog" aria-hidden="true"></div><div class="fog fog-2" aria-hidden="true"></div>
+    <div class="dust" aria-hidden="true"></div>
   <section class="org">
     <span class="org-kicker">Profession</span>
     <h1 class="org-title">The Undertaker</h1>
@@ -66,6 +102,8 @@
       <span class="sep" aria-hidden="true"></span>
       <span class="badge">Helix “Ghost” Solus</span>
     </div>
+  </section>
+    <span class="hero-hint">Scroll to open the casket</span>
   </section>
 
   <!-- ─── Section bar ─── -->
@@ -193,7 +231,14 @@
           <div class="bill-total"><span>Total payout</span><span class="money" id="billTotal">$15</span></div>
           <div class="bill-sub"><span>Est. cost of goods</span><span id="billCost">—</span></div>
           <div class="bill-sub" id="billProfitRow" hidden><span>Est. profit</span><span id="billProfit">—</span></div>
+          <button class="btn btn-active btn-seal" id="btnSeal" aria-pressed="false"><svg><use href="#i-seal"/></svg>Seal the bill</button>
           <button class="btn bill-clear" id="billClear">Clear selection</button>
+          <svg class="seal-wax" viewBox="0 0 100 100" aria-hidden="true">
+            <path class="blob" d="M50 6c9 0 14 6 22 8 8 2 16 6 18 15 2 9-3 15 0 24 3 9-2 17-10 22-8 5-14 14-24 14S30 83 22 78c-8-5-14-12-12-21 2-9-2-16 0-25 2-9 10-13 18-15 8-2 13-11 22-11z"/>
+            <path class="emboss-dark" d="M50 22c-14 0-25 11-25 25s11 25 25 25 25-11 25-25-11-25-25-25z"/>
+            <path class="emboss" d="M50 20c-14 0-25 11-25 25s11 25 25 25 25-11 25-25-11-25-25-25z"/>
+            <path class="emboss" d="M43 36h14l5 9-5 20H43l-5-20z"/>
+          </svg>
         </aside>
       </div>
       <div class="payout-dock" aria-hidden="true"><span>Total payout</span><span class="money" id="dockTotal">$15</span></div>
@@ -278,7 +323,9 @@
 </section>
 
 <div class="status" id="status" role="status" aria-live="polite"></div>
+<div class="lantern" aria-hidden="true"></div>
 
 <script src="/static/js/app.js"></script>
+<script type="module" src="/static/js/fx.js"></script>
 </body>
 </html>
