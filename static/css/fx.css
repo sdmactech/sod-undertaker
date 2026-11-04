@@ -149,19 +149,46 @@ html[data-fxjs] .org-title:not([data-split]) { opacity: 0; }
   .sprite.casket { right: -8%; width: 13rem; bottom: -14%; }
 }
 
-/* ── 3D icon boxes: every bordered square gets depth ───── */
-.sq, .glyph, .seal, .initials { position: relative; transform-style: preserve-3d; transition: transform .45s var(--ease-spring), box-shadow .3s; }
-.sq::after, .glyph::after, .seal::after {
+/* ── 3D icon boxes: the masthead coffin and panel heads get depth ───── */
+.sq, .glyph, .initials { position: relative; transform-style: preserve-3d; transition: transform .45s var(--ease-spring), box-shadow .3s; }
+.sq::after {
   content: ""; position: absolute; inset: 0; border: inherit; border-color: #000; background: #050505; border-radius: inherit;
   transform: translateZ(-6px); opacity: 0; transition: opacity .3s;
 }
-.masthead, .panel-head, .card-top { perspective: 600px; }
+.masthead, .panel-head { perspective: 600px; }
 @media (hover: hover) and (prefers-reduced-motion: no-preference) {
   .sq-lg { transition: transform .6s var(--ease-spring); }
   .mast-id:hover .sq-lg { transform: rotateY(-28deg) rotateX(10deg) translateZ(6px); box-shadow: 4px 6px 0 -1px #000, 0 0 18px rgba(42,163,189,.25); }
   .panel:hover .panel-head .sq { transform: rotateY(-22deg) rotateX(8deg) translateZ(4px); }
-  .card:hover .seal { transform: rotateY(-24deg) rotateX(8deg) translateZ(5px) scale(1.06); }
-  .sq-lg::after, .panel:hover .panel-head .sq::after, .card:hover .seal::after { opacity: 1; }
+  .sq-lg::after, .panel:hover .panel-head .sq::after { opacity: 1; }
+}
+
+/* ── Item registry cards: tilt toward the pointer, a sheen sweeps across,
+      and the item's icon grows, pops out of its box and rocks ───── */
+.cards { perspective: 1400px; }
+.card { transform-style: preserve-3d; transition: transform .5s var(--ease-out), border-color .3s, box-shadow .5s var(--ease-out); will-change: transform; }
+.card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3; opacity: 0;
+  background: linear-gradient(115deg, transparent 30%, rgba(255,235,200,.06) 44%, rgba(98,201,220,.16) 50%, rgba(255,235,200,.06) 56%, transparent 70%);
+  background-size: 250% 100%; background-position: 120% 0; transition: opacity .35s;
+}
+.card .seal { overflow: visible; transform-style: preserve-3d; transform-origin: 50% 60%; transition: transform .55s var(--ease-spring), box-shadow .45s, border-color .3s, filter .4s; z-index: 2; }
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card:hover { transform: rotateX(var(--tx, 0deg)) rotateY(var(--ty, 0deg)) translateZ(10px); border-color: var(--line-3); box-shadow: 0 18px 40px rgba(0,0,0,.55), 0 0 0 1px rgba(42,163,189,.12); z-index: 2; }
+  .card.rank-1:hover { border-color: var(--teal); }
+  .card:hover::before { opacity: 1; animation: sheen 1.1s var(--ease-out) forwards; }
+  .card:hover .seal {
+    opacity: 1;
+    transform: translateZ(34px) scale(1.5) rotate(-9deg);
+    filter: grayscale(.35) contrast(1.15) brightness(1.15) drop-shadow(0 14px 12px rgba(0,0,0,.75));
+    border-color: var(--teal); background: var(--teal-bg); box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 0 24px rgba(42,163,189,.25);
+    animation: seal-rock 2.2s ease-in-out .5s infinite;
+  }
+}
+@keyframes sheen { from { background-position: 120% 0; } to { background-position: -20% 0; } }
+@keyframes seal-rock {
+  0%, 100% { transform: translateZ(34px) scale(1.5) rotate(-9deg); }
+  50%      { transform: translateZ(34px) scale(1.5) rotate(7deg); }
 }
 
 /* ── Scroll reveal for panels and cards ────────────────── */
@@ -226,7 +253,7 @@ html[data-fxjs] .org-title:not([data-split]) { opacity: 0; }
 /* ── Accessibility ─────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .sq, .glyph, .seal, .sq-lg { transition: none !important; }
-  .fog, .dust, .flame, .glow, .org-title .ch, .view .panel, .view .card, .dot.low, .card.out .seal, .row.out .glyph { animation: none !important; }
+  .fog, .dust, .flame, .glow, .org-title .ch, .view .panel, .view .card, .card::before, .card .seal, .dot.low, .card.out .seal, .row.out .glyph { animation: none !important; }
   .org-title .ch { opacity: 1; transform: none; }
   .coin, .puff { display: none; }
   .lantern { display: none; }

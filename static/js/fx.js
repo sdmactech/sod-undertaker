@@ -233,6 +233,26 @@ new MutationObserver(afterRender).observe($('.main'), { childList: true, subtree
 new IntersectionObserver(([en]) => { $('.hero')?.classList.toggle('inview', en.isIntersecting); if (!en.isIntersecting) sound.flame(false); else if (sound.on) sound.flame(true); }, { threshold: 0.02 }).observe($('.hero'));
 reduced.addEventListener('change', e => { if (e.matches) { setMode('light', { save: false }); const b = $('#fxMode'); if (b) { b.disabled = true; b.title = 'Reduced motion is on'; } } });
 
+/* registry cards tilt toward the pointer (max about 7 degrees) */
+if (canHover.matches && !reduced.matches) {
+  let tiltRaf = 0;
+  document.addEventListener('pointermove', e => {
+    const card = e.target.closest && e.target.closest('.card'); if (!card) return;
+    if (tiltRaf) return;
+    tiltRaf = requestAnimationFrame(() => {
+      tiltRaf = 0;
+      const r = card.getBoundingClientRect();
+      const x = (e.clientX - r.left) / r.width - .5, y = (e.clientY - r.top) / r.height - .5;
+      card.style.setProperty('--ty', `${(x * 12).toFixed(2)}deg`);
+      card.style.setProperty('--tx', `${(-y * 9).toFixed(2)}deg`);
+    });
+  }, { passive: true });
+  document.addEventListener('pointerout', e => {
+    const card = e.target.closest && e.target.closest('.card');
+    if (card && !card.contains(e.relatedTarget)) { card.style.removeProperty('--tx'); card.style.removeProperty('--ty'); }
+  });
+}
+
 /* ═══════════════ CONTROLS + INIT ═══════════════ */
 $('#fxMode')?.addEventListener('click', () => setMode(root.dataset.fx === 'full' ? 'light' : 'full'));
 $('#fxSound')?.addEventListener('click', () => sound.set(!sound.on));
