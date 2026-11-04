@@ -14,7 +14,7 @@
   --wax-hi:   #a8342f;
   --ease-dramatic: cubic-bezier(.76, 0, .24, 1);
   --ease-spring:   cubic-bezier(.34, 1.56, .64, 1);
-  --hero-h: clamp(16rem, 42vh, 26rem);
+  --hero-h: clamp(8.4rem, 15vw, 9.75rem);
 }
 
 /* ── Mode + sound toggles in the masthead ─────────────── */
@@ -39,21 +39,37 @@
   .fx-toggle { padding: 0; min-width: 2.75rem; min-height: 2.75rem; justify-content: center; position: relative; }
 }
 
-/* ── Hero stage (replaces the flat banner) ─────────────── */
+/* ── Pinned header: masthead + hero stay put, the ledger slides up over them ── */
+.frame { overflow: clip; }
+.masthead { position: sticky; top: 0; z-index: 6; background: var(--frame); }
+.pinned { position: sticky; top: var(--mast-h, 6.4rem); z-index: 0; }
+.ledger { position: relative; z-index: 2; background: var(--frame); box-shadow: 0 -1px 0 var(--line), 0 -24px 40px rgba(0,0,0,.55); min-height: 60vh; }
+.ledger .section-bar { padding-top: 1.1rem; }
+@media (max-width: 900px) { .pinned { position: relative; top: auto; } .masthead { position: relative; } }
+@media (max-width: 520px) {
+  :root { --hero-h: 8.2rem; }
+  .hero .org { padding: .45rem .6rem .6rem; }
+  .hero .org-kicker { display: none; }
+  .hero .org-title { font-size: 1.45rem; margin: .1rem 0 .3rem; }
+  .hero .org-meta { font-size: .72rem; gap: .3rem .5rem; }
+}
+
+/* ── Hero: a strip not much taller than the v3 banner, graphics to the sides and behind the title ── */
 .hero {
   position: relative; isolation: isolate; overflow: hidden;
-  min-height: var(--hero-h);
+  height: var(--hero-h);
   border-bottom: 1px solid var(--line);
   background:
-    radial-gradient(ellipse 70% 60% at 50% 100%, rgba(42,163,189,.10), transparent 70%),
-    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(80,52,30,.18), transparent 60%),
+    radial-gradient(ellipse 55% 90% at 50% 100%, rgba(42,163,189,.08), transparent 70%),
+    radial-gradient(ellipse 70% 120% at 50% -20%, rgba(80,52,30,.16), transparent 60%),
     #090909;
+  /* parallax: fx.js drives --py (0..1) as the ledger covers the hero */
+  --py: 0;
 }
-.hero .org { position: relative; z-index: 3; border: 0; background: none; padding-top: 1rem; }
-.hero .org-title {
-  font-size: clamp(1.7rem, 8vw, 3.6rem); letter-spacing: .09em;
-  text-shadow: 0 0 22px rgba(42,163,189,.35), 0 2px 0 rgba(0,0,0,.8);
-}
+.hero .org { position: relative; z-index: 3; border: 0; background: none; padding: .55rem 1rem .9rem; transform: translateY(calc(var(--py) * -18px)); opacity: calc(1 - var(--py) * .75); }
+.hero .org-title { font-size: clamp(1.6rem, 4.6vw, 2.5rem); letter-spacing: .09em; margin: .15rem 0 .35rem; text-shadow: 0 0 22px rgba(42,163,189,.35), 0 2px 0 rgba(0,0,0,.9), 0 0 2px rgba(0,0,0,1); }
+.hero .org-kicker { text-shadow: 0 1px 0 #000; }
+.hero .org-meta { text-shadow: 0 1px 0 #000; }
 /* letters rise one by one on first paint; the title waits for the split so it never flashes solid first */
 html[data-fxjs] .org-title:not([data-split]) { opacity: 0; }
 .org-title .ch { display: inline-block; opacity: 0; transform: translateY(.45em) rotateX(-40deg); animation: ch-in .7s var(--ease-out) forwards; animation-delay: calc(var(--i) * 38ms + 120ms); }
@@ -61,20 +77,43 @@ html[data-fxjs] .org-title:not([data-split]) { opacity: 0; }
 .org-title .word { display: inline-block; white-space: nowrap; }
 @keyframes ch-in { to { opacity: 1; transform: none; } }
 
-.stage { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.stage { position: absolute; inset: 0; z-index: 1; pointer-events: none; transform: translateY(calc(var(--py) * 22px)); }
 .stage canvas { width: 100%; height: 100%; display: block; }
 .stage-3d { display: none; }
 :root[data-fx="full"] .stage-3d { display: block; pointer-events: auto; }
 :root[data-fx="full"] .stage-css, :root[data-fx="full"] .dust { display: none; }
 .stage-css { pointer-events: auto; }
-.hero::after { content: ""; position: absolute; inset: 0; z-index: 4; pointer-events: none; box-shadow: inset 0 0 90px rgba(0,0,0,.6); }
+.hero::after { content: ""; position: absolute; inset: 0; z-index: 4; pointer-events: none; box-shadow: inset 0 0 70px rgba(0,0,0,.65); background: rgba(0,0,0,calc(var(--py) * .55)); }
 /* ambience only runs while the hero is on screen */
-.hero:not(.inview) .fog, .hero:not(.inview) .dust i, .hero:not(.inview) .candle-css::before, .hero:not(.inview) .candle-css::after, .hero:not(.inview) .candle-css .glow, .hero:not(.inview) .hero-hint { animation-play-state: paused; }
+.hero:not(.inview) .fog, .hero:not(.inview) .dust i, .hero:not(.inview) .flame, .hero:not(.inview) .glow { animation-play-state: paused; }
+
+/* ── Light mode: rendered sprites of the same models ── */
+.sprite { position: absolute; bottom: 0; pointer-events: none; }
+.sprite img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; filter: drop-shadow(0 10px 10px rgba(0,0,0,.7)); }
+.sprite.candelabra { left: 6%; bottom: -6%; width: clamp(5.4rem, 10vw, 8.2rem); }
+.sprite.skull { left: 15.5%; bottom: -12%; width: clamp(3.6rem, 6.6vw, 5.4rem); z-index: 1; }
+.sprite.casket { right: 2.5%; bottom: -10%; width: clamp(16rem, 34vw, 29rem); perspective: 900px; perspective-origin: 50% 30%; pointer-events: auto; }
+.sprite.casket .casket-lid { position: absolute; inset: 0; transform-origin: 50% 27.4%; transform-style: preserve-3d; transform: rotateX(calc(var(--open, 0) * 62deg)) translateZ(calc(var(--open, 0) * 2px)); filter: drop-shadow(0 6px 6px rgba(0,0,0,.6)); will-change: transform; }
+.sprite.casket.hover .casket-lid { animation: creak .9s ease-in-out; }
+@keyframes creak { 30% { transform: rotateX(calc(var(--open, 0) * 62deg + 1.2deg)); } 60% { transform: rotateX(calc(var(--open, 0) * 62deg - .8deg)); } }
+.sprite.lantern-prop { right: 36%; bottom: -4%; width: clamp(2.6rem, 4.4vw, 3.6rem); }
+.sprite .glow { position: absolute; left: 50%; top: 18%; width: 300%; aspect-ratio: 1; transform: translate(-50%, -40%); pointer-events: none;
+  background: radial-gradient(circle, rgba(255,170,80,.28), rgba(255,150,60,.08) 38%, transparent 68%); animation: glow 2.4s ease-in-out infinite alternate; }
+.sprite.lantern-prop .glow { top: 40%; width: 420%; animation-duration: 3.1s; }
+/* the three CSS flames sit on the candelabra's candle tips (fractions of the sprite box) */
+.flame { position: absolute; width: 7%; aspect-ratio: .42; transform-origin: 50% 100%; z-index: 2;
+  background: url(/static/img/flame.png) center / contain no-repeat; mix-blend-mode: screen; filter: blur(.3px);
+  animation: flame .16s ease-in-out infinite alternate; }
+.flame.f1 { left: 46.5%; top: 11%; width: 8%; }
+.flame.f2 { left: 29.5%; top: 14%; animation-delay: -.07s; }
+.flame.f3 { left: 64.5%; top: 14%; animation-delay: -.11s; }
+@keyframes flame { from { transform: scaleY(1) skewX(0deg); opacity: .95; } to { transform: translateX(-3%) scaleY(1.14) skewX(3deg); opacity: 1; } }
+@keyframes glow { from { opacity: .75; } 50% { opacity: 1; } to { opacity: .6; } }
 
 /* fog, two drifting layers */
-.fog { position: absolute; inset: -20% -10%; z-index: 2; pointer-events: none; opacity: .55; mix-blend-mode: screen;
-  background: radial-gradient(ellipse 40% 30% at 20% 80%, rgba(120,140,150,.14), transparent 70%),
-              radial-gradient(ellipse 50% 35% at 75% 85%, rgba(100,120,130,.12), transparent 70%);
+.fog { position: absolute; inset: -20% -10%; z-index: 2; pointer-events: none; opacity: .5; mix-blend-mode: screen;
+  background: radial-gradient(ellipse 40% 40% at 20% 85%, rgba(120,140,150,.14), transparent 70%),
+              radial-gradient(ellipse 50% 45% at 75% 90%, rgba(100,120,130,.12), transparent 70%);
   animation: fog-drift 28s ease-in-out infinite alternate; }
 .fog.fog-2 { animation-duration: 41s; animation-direction: alternate-reverse; opacity: .35; transform: scaleX(-1); }
 @keyframes fog-drift { from { transform: translateX(-4%) translateY(1%); } to { transform: translateX(5%) translateY(-2%); } }
@@ -90,55 +129,25 @@ html[data-fxjs] .org-title:not([data-split]) { opacity: 0; }
   0%   { transform: translate3d(0, 0, 0); opacity: 0; }
   10%  { opacity: var(--o); }
   90%  { opacity: var(--o); }
-  100% { transform: translate3d(var(--dx), -130vh, 0) translateY(0); opacity: 0; }
+  100% { transform: translate3d(var(--dx), -40rem, 0); opacity: 0; }
 }
 
 /* lantern: a warm pool of light that follows the pointer (full mode) */
 .lantern { position: absolute; inset: 0; z-index: 3; pointer-events: none; opacity: 0; transition: opacity .6s ease; mix-blend-mode: soft-light;
-  background: radial-gradient(circle 22rem at var(--lx, 50%) var(--ly, 30%), rgba(255,196,120,.55), rgba(255,170,90,.18) 40%, transparent 70%); }
+  background: radial-gradient(circle 16rem at var(--lx, 50%) var(--ly, 30%), rgba(255,196,120,.5), rgba(255,170,90,.16) 40%, transparent 70%); }
 :root[data-fx="full"] .lantern.on { opacity: 1; }
 @media (hover: none) { .lantern { display: none; } }
 
-/* ── Light mode: CSS 3D casket ─────────────────────────── */
-.casket-css {
-  position: absolute; left: 50%; bottom: 6%; width: clamp(17rem, 40vw, 30rem); aspect-ratio: 2.1;
-  transform: translateX(-50%); perspective: 1100px; perspective-origin: 50% 20%;
-  pointer-events: auto;
+@media (max-width: 900px) {
+  .sprite.candelabra { left: 2%; width: 5rem; }
+  .sprite.skull { left: 14%; width: 3.2rem; }
+  .sprite.casket { right: -4%; width: 15rem; }
+  .sprite.lantern-prop { display: none; }
 }
-.casket-css .c3 { position: absolute; inset: 0; transform-style: preserve-3d; transform: rotateX(52deg) rotateZ(-12deg); }
-.casket-css .c-body, .casket-css .c-inner, .casket-css .c-lid { position: absolute; inset: 0; }
-.casket-css svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.casket-css .c-shadow { position: absolute; inset: -6% -4%; background: radial-gradient(ellipse, rgba(0,0,0,.85), transparent 68%); transform: translateZ(-10px) translateX(10px); filter: blur(12px); }
-/* the body: silhouette plus six stacked copies for thickness */
-.casket-css .c-body { transform: translateZ(0); }
-.casket-css .c-body svg { fill: #2a1b10; stroke: #5a3d24; stroke-width: 1.4; }
-.casket-css .c-body .layer { position: absolute; inset: 0; }
-.casket-css .c-inner { transform: translateZ(14px); }
-.casket-css .c-inner svg { fill: #2c0d10; stroke: #4a1e22; }
-.casket-css .c-inner .skull { fill: #cfc6ad; stroke: #7a7260; stroke-width: .8; opacity: .9; }
-.casket-css .c-lid { transform-origin: 0% 50%; transform-style: preserve-3d; }
-.casket-css .c-lid svg { fill: url(#lidWood); stroke: #6a4a2c; stroke-width: 1.6; }
-.casket-css .c-lid .cross { fill: #b8862e; stroke: #6f5119; stroke-width: .6; }
-.casket-css .c-lid .edge { fill: #140c07; }
-.casket-css .handle { fill: #a8793a; stroke: #5b4019; stroke-width: .6; }
-.casket-css .c-lid { transform: translateZ(26px) rotateY(calc(var(--open, 0) * -112deg)); }
-.casket-css.hover .c3 { animation: creak .9s ease-in-out; }
-@keyframes creak { 30% { transform: rotateX(52deg) rotateZ(-11.2deg); } 60% { transform: rotateX(52deg) rotateZ(-12.6deg); } }
-/* two CSS candles flanking it */
-.candle-css { position: absolute; bottom: 12%; width: 1.1rem; height: 5.5rem; pointer-events: none; }
-.candle-css.l { left: 18%; } .candle-css.r { right: 18%; height: 4.2rem; }
-.candle-css::before { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, #d9cfb0, #f0e8cc 40%, #b8ad8e); border-radius: 2px 2px 0 0; box-shadow: 0 0 0 1px #4a3f2a; }
-.candle-css::after { content: ""; position: absolute; left: 50%; top: -1.5rem; width: .6rem; height: 1.6rem; transform: translateX(-50%);
-  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
-  background: radial-gradient(ellipse at 50% 80%, var(--flame-hi), var(--flame) 45%, rgba(196,81,47,.7) 70%, transparent 85%);
-  filter: blur(.4px); animation: flame .18s ease-in-out infinite alternate; transform-origin: 50% 100%; }
-.candle-css .glow { position: absolute; left: 50%; top: -3rem; width: 14rem; height: 14rem; transform: translate(-50%, -30%); pointer-events: none;
-  background: radial-gradient(circle, rgba(233,163,59,.28), rgba(233,163,59,.06) 40%, transparent 70%); animation: glow 2.4s ease-in-out infinite alternate; }
-@keyframes flame { from { transform: translateX(-50%) scaleY(1) skewX(0deg); } to { transform: translateX(-52%) scaleY(1.12) skewX(3deg); } }
-@keyframes glow { from { opacity: .75; } 50% { opacity: 1; } to { opacity: .6; } }
-
-.hero-hint { position: absolute; left: 50%; bottom: .6rem; z-index: 3; transform: translateX(-50%); font: 400 .66rem/1 var(--font-display); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); pointer-events: none; opacity: .8; }
-@keyframes hint { 50% { transform: translateX(-50%) translateY(3px); opacity: .45; } }
+@media (max-width: 520px) {
+  .sprite.skull { display: none; }
+  .sprite.casket { right: -8%; width: 13rem; bottom: -14%; }
+}
 
 /* ── 3D icon boxes: every bordered square gets depth ───── */
 .sq, .glyph, .seal, .initials { position: relative; transform-style: preserve-3d; transition: transform .45s var(--ease-spring), box-shadow .3s; }
@@ -215,15 +224,9 @@ html[data-fxjs] .org-title:not([data-split]) { opacity: 0; }
 .stage-3d.ready .veil { opacity: 0; pointer-events: none; }
 
 /* ── Accessibility ─────────────────────────────────────── */
-@media (max-width: 700px) {
-  .hero .org { padding-bottom: 7.5rem; }
-  .casket-css { bottom: 9%; width: min(80vw, 19rem); }
-  .candle-css { display: none; }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .sq, .glyph, .seal, .sq-lg, .casket-css .c-lid { transition: none !important; }
-  .fog, .dust, .candle-css::after, .candle-css .glow, .hero-hint, .org-title .ch, .view .panel, .view .card, .dot.low, .stepper.zero input, .card.out .seal, .row.out .glyph { animation: none !important; }
+  .sq, .glyph, .seal, .sq-lg { transition: none !important; }
+  .fog, .dust, .flame, .glow, .org-title .ch, .view .panel, .view .card, .dot.low, .card.out .seal, .row.out .glyph { animation: none !important; }
   .org-title .ch { opacity: 1; transform: none; }
   .coin, .puff { display: none; }
   .lantern { display: none; }

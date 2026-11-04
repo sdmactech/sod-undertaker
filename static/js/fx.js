@@ -40,7 +40,7 @@ async function setMode(mode, { save = true } = {}) {
   if (mode === 'full') {
     if (!scene && !sceneLoading) {
       const fail = err => { console.error('3D scene failed, falling back', err); sceneLoading = null; scene?.dispose(); scene = null; setMode('light'); };
-      sceneLoading = import('./scene3d.js').then(m => {
+      sceneLoading = import(`./scene3d.js?v=${new URL(import.meta.url).searchParams.get('v') || ''}`).then(m => {
         scene = m.createScene($('#stage3d'), { onCreak: () => sound.play('creak'), onReady: () => $('#stage3d').classList.add('ready'), onError: fail });
         scene.setOpen(openAmount);
         if (root.dataset.fx !== 'full') scene.pause();
@@ -125,25 +125,26 @@ function seedDust(el, n = 26) {
   }).join('');
 }
 
-/* Scroll opens the lid: 0 at the top, 1 after ~55% of the hero has scrolled by.
-   Both modes read the same number. */
+/* Scroll opens the lid and drives the parallax: 0 at the top, 1 once the ledger has
+   covered about 70% of the hero. Both modes read the same number. */
 let openAmount = 0;
 let lastCreakAt = -1;
+const heroEl = $('.hero');
 function onScroll() {
-  const hero = $('.hero'); if (!hero || reduced.matches) return;
-  const h = hero.offsetHeight || 1;
-  const y = Math.max(0, Math.min(1, window.scrollY / (h * .55)));
+  if (!heroEl || reduced.matches) return;
+  const h = heroEl.offsetHeight || 1;
+  const y = Math.max(0, Math.min(1, window.scrollY / (h * .7)));
+  heroEl.style.setProperty('--py', y.toFixed(3));
   const eased = y < .5 ? 2 * y * y : 1 - Math.pow(-2 * y + 2, 2) / 2;
   if (Math.abs(eased - openAmount) < .002) return;
   const was = openAmount; openAmount = eased;
   root.style.setProperty('--open', eased.toFixed(3));
   scene?.setOpen(eased);
-  // creak once as it starts to open and once as it closes
   if ((was < .08 && eased >= .08) || (was > .92 && eased <= .92)) { if (performance.now() - lastCreakAt > 900) { sound.play('creak', { rate: .9 + Math.random() * .2 }); lastCreakAt = performance.now(); } }
 }
 
 function bindCasketHover() {
-  const c = $('.casket-css'); if (!c) return;
+  const c = $('[data-casket]'); if (!c) return;
   let t;
   c.addEventListener('pointerenter', () => { if (!canHover.matches || reduced.matches) return; c.classList.add('hover'); sound.play('creak', { rate: 1.15, vol: .5 }); clearTimeout(t); t = setTimeout(() => c.classList.remove('hover'), 950); });
 }
@@ -241,6 +242,9 @@ splitTitle();
 seedDust($('.dust'));
 bindCasketHover();
 bindLantern();
+function mastHeight() { const m = $('.masthead'); if (m) root.style.setProperty('--mast-h', `${m.offsetHeight}px`); }
+new ResizeObserver(mastHeight).observe($('.masthead'));
+mastHeight();
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 markLow(); stagger();

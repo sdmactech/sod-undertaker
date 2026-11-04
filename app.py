@@ -240,9 +240,21 @@ def seed_database():
 
 # ─── Routes ───────────────────────────────────────────────────────────────────
 
+# Cache-busting stamp for the static files: newest mtime under static/, so a deploy busts the hour-long cache
+def _asset_version():
+    newest = 0
+    for root, _dirs, files in os.walk(app.static_folder):
+        for f in files:
+            try:
+                newest = max(newest, int(os.path.getmtime(os.path.join(root, f))))
+            except OSError:
+                pass
+    return newest
+
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', v=_asset_version())
 
 
 # ── Items API ──────────────────────────────────────────────────────────────────

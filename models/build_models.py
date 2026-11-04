@@ -1,64 +1,129 @@
 """
-Procedural models for the Undertaker's Ledger v4.
-Run headless:  blender -b -P models/build_models.py -- static/models
-Every mesh is built from primitives in this file, so the repo carries no
-third-party geometry. Exports one .glb per model with PBR materials.
-Objects that must animate (the casket lid) keep their pivot at the hinge.
+Models for the Undertaker's Ledger v4 hero stage.
+Run headless:  blender -b -P models/build_models.py -- static/models [casket skull candle spade lantern bell]
+
+Sources (all CC0, see models/sources/LICENSES.md):
+  casket  built here: toe-pincher body, plinth, raised-panel lid hinged on the back edge,
+          brass bail handles, corner plates and nameplate; Poly Haven dark_wood PBR set
+  skull   CDmir's sculpt from OpenGameArt (OBJ + 2K diffuse / normal / roughness / AO)
+  candle  Poly Haven brass_candleholders, one holder with its candle (flame is a shader in scene3d.js)
+  spade   Poly Haven rusted_spade_01
+  lantern Poly Haven Lantern_01
+  bell    built here, lathed brass
 """
 import math
-import sys
 import os
-import bpy
-import bmesh
-from mathutils import Vector
+import sys
 
-OUT = sys.argv[sys.argv.index("--") + 1] if "--" in sys.argv else "static/models"
+import bmesh
+import bpy
+from mathutils import Matrix, Vector
+
+ARGS = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
+OUT = ARGS[0] if ARGS else "static/models"
+ONLY = ARGS[1:]
+HERE = os.path.dirname(os.path.abspath(__file__))
+SRC = os.path.join(HERE, "sources")
 os.makedirs(OUT, exist_ok=True)
 
 
-# ── helpers ───────────────────────────────────────────────
+# ── helpers ──────────────────────────────────────────────────────────
 def clear():
     bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
-def material(name, color, rough=0.6, metal=0.0, emit=None, emit_strength=0.0):
+def img(path):
+    return bpy.data.images.load(path, check_existing=True)
+
+
+def pbr_material(name, diff=None, nor=None, arm=None, rough_map=None, ao=None, color=(1, 1, 1), rough=0.5, metal=0.0, scale=1.0, normal_strength=1.0):
+    """Principled material from texture maps. arm = Poly Haven packed AO(R) Rough(G) Metal(B)."""
     m = bpy.data.materials.new(name)
     m.use_nodes = True
-    bsdf = m.node_tree.nodes["Principled BSDF"]
-    bsdf.inputs["Base Color"].default_value = (*color, 1.0)
+    nt = m.node_tree
+    bsdf = nt.nodes["Principled BSDF"]
+    bsdf.inputs["Base Color"].default_value = (*color, 1)
     bsdf.inputs["Roughness"].default_value = rough
     bsdf.inputs["Metallic"].default_value = metal
-    if emit:
-        bsdf.inputs["Emission Color"].default_value = (*emit, 1.0)
-        bsdf.inputs["Emission Strength"].default_value = emit_strength
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    mp = nt.nodes.new("ShaderNodeMapping")
+    mp.inputs["Scale"].default_value = (scale, scale, scale)
+    nt.links.new(tc.outputs["UV"], mp.inputs["Vector"])
+
+    def tex(path, colorspace="sRGB"):
+        t = nt.nodes.new("ShaderNodeTexImage")
+        t.image = img(path)
+        t.image.colorspace_settings.name = colorspace
+        nt.links.new(mp.outputs["Vector"], t.inputs["Vector"])
+        return t
+
+    base = None
+    if diff:
+        base = tex(diff)
+        if ao:
+            a = tex(ao, "Non-Color")
+            mix = nt.nodes.new("ShaderNodeMix")
+            mix.data_type = "RGBA"
+            mix.blend_type = "MULTIPLY"
+            mix.inputs["Factor"].default_value = 0.85
+            nt.links.new(base.outputs["Color"], mix.inputs["A"])
+            nt.links.new(a.outputs["Color"], mix.inputs["B"])
+            nt.links.new(mix.outputs["Result"], bsdf.inputs["Base Color"])
+        else:
+            nt.links.new(base.outputs["Color"], bsdf.inputs["Base Color"])
+    if nor:
+        n = tex(nor, "Non-Color")
+        nm = nt.nodes.new("ShaderNodeNormalMap")
+        nm.inputs["Strength"].default_value = normal_strength
+        nt.links.new(n.outputs["Color"], nm.inputs["Color"])
+        nt.links.new(nm.outputs["Normal"], bsdf.inputs["Normal"])
+    if arm:
+        a = tex(arm, "Non-Color")
+        sep = nt.nodes.new("ShaderNodeSeparateColor")
+        nt.links.new(a.outputs["Color"], sep.inputs["Color"])
+        nt.links.new(sep.outputs["Green"], bsdf.inputs["Roughness"])
+        nt.links.new(sep.outputs["Blue"], bsdf.inputs["Metallic"])
+    if rough_map:
+        r = tex(rough_map, "Non-Color")
+        nt.links.new(r.outputs["Color"], bsdf.inputs["Roughness"])
     return m
 
 
-WOOD = (0.075, 0.045, 0.028)      # near-black ebonised oak
-WOOD_HI = (0.14, 0.085, 0.05)
-BRASS = (0.72, 0.52, 0.22)
-BONE = (0.80, 0.74, 0.60)
-IRON = (0.16, 0.16, 0.17)
-WAX = (0.90, 0.86, 0.74)
-TEAL = (0.16, 0.64, 0.74)
-
-
-def bevel(obj, width=0.012, segments=3):
+def bevel(obj, width=0.01, segments=3, angle=35):
     mod = obj.modifiers.new("Bevel", "BEVEL")
     mod.width = width
     mod.segments = segments
     mod.limit_method = "ANGLE"
+    mod.angle_limit = math.radians(angle)
     return mod
 
 
-def shade_smooth(obj, angle=math.radians(35)):
+def apply_mods(obj):
     bpy.context.view_layer.objects.active = obj
     obj.select_set(True)
-    bpy.ops.object.shade_smooth_by_angle(angle=angle) if hasattr(bpy.ops.object, "shade_smooth_by_angle") else bpy.ops.object.shade_smooth()
+    for m in list(obj.modifiers):
+        bpy.ops.object.modifier_apply(modifier=m.name)
     obj.select_set(False)
 
 
-def new_mesh_obj(name, bm, mat):
+def smooth(obj, angle=40):
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.shade_smooth_by_angle(angle=math.radians(angle))
+    obj.select_set(False)
+
+
+def cube_uv(obj, size=1.0):
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.uv.cube_project(cube_size=size, correct_aspect=True, scale_to_bounds=False)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    obj.select_set(False)
+
+
+def new_obj(name, bm, mat=None):
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
     bm.free()
@@ -69,28 +134,7 @@ def new_mesh_obj(name, bm, mat):
     return ob
 
 
-def apply_all(obj):
-    bpy.context.view_layer.objects.active = obj
-    obj.select_set(True)
-    for m in list(obj.modifiers):
-        bpy.ops.object.modifier_apply(modifier=m.name)
-    obj.select_set(False)
-
-
-def export(name):
-    path = os.path.join(OUT, f"{name}.glb")
-    bpy.ops.object.select_all(action="SELECT")
-    bpy.ops.export_scene.gltf(
-        filepath=path, export_format="GLB", use_selection=True,
-        export_apply=True, export_yup=True, export_animations=False,
-        export_materials="EXPORT", export_texcoords=True, export_normals=True,
-        export_draco_mesh_compression_enable=False,
-    )
-    print(f"wrote {path} ({os.path.getsize(path)//1024} KB)")
-
-
-def prism(name, profile, depth, mat, z0=0.0):
-    """Extrude a closed 2D profile (list of (x, y)) along +Z by depth."""
+def prism(name, profile, depth, mat=None, z0=0.0):
     bm = bmesh.new()
     verts = [bm.verts.new((x, y, z0)) for x, y in profile]
     bm.faces.new(verts)
@@ -99,233 +143,295 @@ def prism(name, profile, depth, mat, z0=0.0):
     up = [g for g in r["geom"] if isinstance(g, bmesh.types.BMVert)]
     bmesh.ops.translate(bm, verts=up, vec=(0, 0, depth))
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    return new_mesh_obj(name, bm, mat)
+    return new_obj(name, bm, mat)
 
 
-# ── CASKET: Victorian toe-pincher, lid hinged along the back ─
+def box(name, size, loc, mat, bev=0.004):
+    bpy.ops.mesh.primitive_cube_add(size=1, location=loc)
+    o = bpy.context.active_object
+    o.name = name
+    o.scale = size
+    o.data.materials.append(mat)
+    if bev:
+        bevel(o, bev, 2)
+    return o
+
+
+def join(objs, name):
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.join()
+    j = bpy.context.view_layer.objects.active
+    j.name = name
+    return j
+
+
+def shrink_images(max_px):
+    """Downscale every loaded image so the GLB stays small; the hero strip never shows a prop larger than ~150 px."""
+    for im in bpy.data.images:
+        if im.size[0] > max_px or im.size[1] > max_px:
+            f = max_px / max(im.size)
+            im.scale(max(1, int(im.size[0] * f)), max(1, int(im.size[1] * f)))
+
+
+def export(name, max_px=None):
+    if max_px:
+        shrink_images(max_px)
+    path = os.path.join(OUT, f"{name}.glb")
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.export_scene.gltf(
+        filepath=path, export_format="GLB", use_selection=True, export_apply=True,
+        export_yup=True, export_animations=False, export_materials="EXPORT",
+        export_image_format="JPEG", export_jpeg_quality=74,
+        export_texcoords=True, export_normals=True, export_tangents=False,
+    )
+    print(f"wrote {path} ({os.path.getsize(path) // 1024} KB)")
+
+
+def scale_outline(pts, sx, sy):
+    return [(x * sx, y * sy) for x, y in pts]
+
+
+# ── CASKET ───────────────────────────────────────────────────────────
+# Plan view: x across, y along the length, head at +y. A classic 1890s toe-pincher.
+L = 1.98
+HEAD, SHOULDER, FOOT = 0.46, 0.70, 0.36
+SH_Y = 0.38
+OUTLINE = [(-HEAD / 2, L / 2), (HEAD / 2, L / 2), (SHOULDER / 2, SH_Y), (FOOT / 2, -L / 2),
+           (-FOOT / 2, -L / 2), (-SHOULDER / 2, SH_Y)]
+H = 0.40       # body height
+WALL = 0.045   # wall thickness
+LID_H = 0.065  # lid slab
+PANEL_H = 0.028
+
+
 def build_casket():
     clear()
-    wood = material("Wood", WOOD, rough=0.45)
-    trim = material("Brass", BRASS, rough=0.3, metal=1.0)
-    lining = material("Lining", (0.10, 0.03, 0.04), rough=0.9)
+    wd = os.path.join(SRC, "textures", "dark_wood")
+    wood = pbr_material("CasketWood", diff=f"{wd}/dark_wood_diff_1k.jpg", nor=f"{wd}/dark_wood_nor_gl_1k.jpg", arm=f"{wd}/dark_wood_arm_1k.jpg", scale=0.9)
+    brass = pbr_material("Brass", color=(0.78, 0.58, 0.25), rough=0.32, metal=1.0)
+    brass_dark = pbr_material("BrassAged", color=(0.52, 0.37, 0.15), rough=0.45, metal=1.0)
+    velvet = pbr_material("Velvet", color=(0.16, 0.025, 0.035), rough=0.95)
 
-    # plan view of the coffin (x across, y along the length). Head at +y.
-    L, W_SH, W_HD, W_FT = 2.0, 0.72, 0.46, 0.38
-    outer = [(-W_HD / 2, 1.0), (W_HD / 2, 1.0), (W_SH / 2, 0.42), (W_FT / 2, -1.0),
-             (-W_FT / 2, -1.0), (-W_SH / 2, 0.42)]
-    H = 0.42
-    body = prism("CasketBody", outer, H, wood)
-    bevel(body, 0.02, 3)
+    # body: solid prism, then carve the cavity by insetting the top face and pushing it down
+    body = prism("CasketBody", OUTLINE, H, wood)
+    bm = bmesh.new()
+    bm.from_mesh(body.data)
+    bm.faces.ensure_lookup_table()
+    top = max(bm.faces, key=lambda f: f.calc_center_median().z)
+    res = bmesh.ops.inset_individual(bm, faces=[top], thickness=WALL, depth=0.0)
+    inner = [f for f in bm.faces if abs(f.calc_center_median().z - H) < 1e-4 and f not in res["faces"]]
+    inner = [f for f in inner if f.calc_area() > 0.1]
+    r = bmesh.ops.extrude_face_region(bm, geom=inner)
+    vs = [g for g in r["geom"] if isinstance(g, bmesh.types.BMVert)]
+    bmesh.ops.translate(bm, verts=vs, vec=(0, 0, -(H - 0.06)))
+    bmesh.ops.delete(bm, geom=inner, context="FACES")
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    bm.to_mesh(body.data)
+    bm.free()
+    bevel(body, 0.012, 3)
+    apply_mods(body)
+    cube_uv(body, 1.0)
+    # velvet lining: a soft pad sitting in the cavity
+    pad = prism("Lining", scale_outline(OUTLINE, 0.84, 0.94), 0.05, velvet, z0=0.07)
+    bevel(pad, 0.02, 3)
+    apply_mods(pad)
+    cube_uv(pad)
+    # plinth moulding under the body
+    plinth = prism("Plinth", scale_outline(OUTLINE, 1.06, 1.02), 0.05, wood, z0=-0.05)
+    bevel(plinth, 0.015, 3)
+    apply_mods(plinth)
+    cube_uv(plinth)
 
-    # hollow it: inset the top face into a cavity
-    t = 0.045
-    inner = [(x * (1 - t * 2.2 / (abs(x) * 2 + 1e-6)) if abs(x) > 0.01 else x, y * (1 - t / 1.0)) for x, y in outer]
-    cavity = prism("Cavity", inner, H, lining, z0=0.07)
-    boolm = body.modifiers.new("Hollow", "BOOLEAN")
-    boolm.operation = "DIFFERENCE"
-    boolm.object = cavity
-    apply_all(body)
-    bpy.data.objects.remove(cavity)
-    # dark lining pad inside
-    pad = prism("Lining", [(x * 0.93, y * 0.95) for x, y in inner], 0.04, lining, z0=0.08)
-
-    # lid: same outline, thin, slightly proud, pivot at the back edge (-x side) so it swings open sideways
-    lid_h = 0.08
-    lid = prism("CasketLid", [(x * 1.01, y * 1.01) for x, y in outer], lid_h, wood, z0=0.0)
-    bevel(lid, 0.02, 3)
-    apply_all(lid)
-    # raised cross on the lid
-    bar_v = prism("CrossV", [(-0.035, 0.62), (0.035, 0.62), (0.035, -0.55), (-0.035, -0.55)], 0.025, trim, z0=lid_h)
-    bar_h = prism("CrossH", [(-0.19, 0.38), (0.19, 0.38), (0.19, 0.31), (-0.19, 0.31)], 0.025, trim, z0=lid_h)
-    for o in (bar_v, bar_h):
-        bevel(o, 0.006, 2); apply_all(o)
-    # join cross into the lid, then move pivot to the hinge line (x = -W_SH/2, z = H)
-    bpy.ops.object.select_all(action="DESELECT")
-    for o in (lid, bar_v, bar_h):
-        o.select_set(True)
-    bpy.context.view_layer.objects.active = lid
-    bpy.ops.object.join()
-    lid = bpy.context.view_layer.objects.active
-    # set origin to the hinge: translate mesh so the hinge line sits at the object origin
-    hinge = Vector((-W_SH / 2 * 1.01, 0, 0))
-    lid.data.transform(bpy.data.objects[lid.name].matrix_world.inverted() @ __import__("mathutils").Matrix.Translation(-hinge))
+    # lid: slab with a chamfered edge and a raised centre panel, hinge on the -x (back) side
+    lid = prism("LidSlab", scale_outline(OUTLINE, 1.03, 1.012), LID_H, wood, z0=0.0)
+    bevel(lid, 0.022, 4)
+    apply_mods(lid)
+    cube_uv(lid)
+    panel = prism("LidPanel", scale_outline(OUTLINE, 0.72, 0.86), PANEL_H, wood, z0=LID_H)
+    bevel(panel, 0.014, 4)
+    apply_mods(panel)
+    cube_uv(panel)
+    plate = box("NamePlate", (0.11, 0.2, 0.006), (0, 0.18, LID_H + PANEL_H + 0.003), brass, 0.002)
+    apply_mods(plate)
+    cross_v = box("CrossV", (0.035, 0.44, 0.012), (0, -0.28, LID_H + PANEL_H + 0.004), brass_dark, 0.003)
+    cross_h = box("CrossH", (0.16, 0.035, 0.012), (0, -0.14, LID_H + PANEL_H + 0.004), brass_dark, 0.003)
+    for o in (cross_v, cross_h):
+        apply_mods(o)
+    lid = join([lid, panel, plate, cross_v, cross_h], "CasketLid")
+    # move the pivot to the hinge line: back edge (-x), top of the body
+    hinge = Vector((-SHOULDER / 2 * 1.03, 0, 0))
+    lid.data.transform(Matrix.Translation(-hinge))
     lid.location = hinge + Vector((0, 0, H))
 
-    # brass handles: three per side
-    for side in (-1, 1):
-        for i, y in enumerate((0.62, 0.05, -0.55)):
-            wx = {0: W_HD / 2 * 0.78 + 0.1 * side * 0 + (W_SH / 2 - W_HD / 2) * 0.55, 1: W_SH / 2 * 0.96, 2: (W_SH / 2 + W_FT / 2) / 2 * 0.98}[i]
-            bpy.ops.mesh.primitive_torus_add(major_radius=0.07, minor_radius=0.012, major_segments=24, minor_segments=10,
-                                             location=(side * (wx + 0.02), y, H * 0.5), rotation=(0, math.radians(90), 0))
-            h = bpy.context.active_object
-            h.name = f"Handle{side}{i}"
-            h.data.materials.append(trim)
-            h.scale = (1, 1, 0.6)
-            # mounting plate
-            bpy.ops.mesh.primitive_cube_add(size=1, location=(side * wx, y, H * 0.5))
-            p = bpy.context.active_object
-            p.name = f"Plate{side}{i}"
-            p.scale = (0.02, 0.1, 0.12)
-            p.data.materials.append(trim)
-            bevel(p, 0.004, 2)
+    # brass bail handles: three per side, each a backplate plus a swinging bail
+    def side_point(t, sx):
+        """point on the side polyline at parameter t in [0,1] from head to foot, side sx = +-1"""
+        pts = [(sx * HEAD / 2, L / 2), (sx * SHOULDER / 2, SH_Y), (sx * FOOT / 2, -L / 2)]
+        d1 = math.dist(pts[0], pts[1]); d2 = math.dist(pts[1], pts[2]); tot = d1 + d2
+        s = t * tot
+        if s <= d1:
+            k = s / d1; a, b = pts[0], pts[1]
+        else:
+            k = (s - d1) / d2; a, b = pts[1], pts[2]
+        x = a[0] + (b[0] - a[0]) * k; y = a[1] + (b[1] - a[1]) * k
+        ang = math.atan2(b[1] - a[1], b[0] - a[0])
+        return x, y, ang
 
-    # four short feet
+    handles = []
     for sx in (-1, 1):
-        for sy in (-1, 1):
-            bpy.ops.mesh.primitive_cylinder_add(radius=0.05, depth=0.06, vertices=16,
-                                                location=(sx * 0.22, sy * 0.78, -0.03))
-            f = bpy.context.active_object
-            f.name = f"Foot{sx}{sy}"
-            f.data.materials.append(wood)
+        for t in (0.18, 0.5, 0.82):
+            x, y, ang = side_point(t, sx)
+            nx, ny = math.cos(ang - math.pi / 2) * -sx, math.sin(ang - math.pi / 2) * -sx  # outward normal
+            # outward normal pointing away from the centre line
+            if (x * nx) < 0:
+                nx, ny = -nx, -ny
+            bp = box(f"Plate{sx}{t}", (0.012, 0.16, 0.09), (x + nx * 0.006, y + ny * 0.006, H * 0.52), brass, 0.003)
+            bp.rotation_euler = (0, 0, ang)
+            bpy.ops.mesh.primitive_torus_add(major_radius=0.052, minor_radius=0.009, major_segments=28, minor_segments=10,
+                                             location=(x + nx * 0.03, y + ny * 0.03, H * 0.47))
+            bail = bpy.context.active_object
+            bail.name = f"Bail{sx}{t}"
+            bail.rotation_euler = (0, math.radians(90), ang)
+            bail.scale = (1, 1.35, 1)
+            bail.data.materials.append(brass)
+            handles += [bp, bail]
+    # corner plates on the shoulders
+    for sx in (-1, 1):
+        cp = box(f"Corner{sx}", (0.04, 0.04, 0.12), (sx * SHOULDER / 2, SH_Y, H * 0.5), brass_dark, 0.004)
+        cp.rotation_euler = (0, 0, math.radians(-25 * sx))
+        handles.append(cp)
+    for o in handles:
+        apply_mods(o)
+    brassware = join(handles, "Brassware")
 
     for ob in bpy.context.scene.objects:
-        if ob.type == "MESH":
-            shade_smooth(ob)
-    export("casket")
+        smooth(ob, 45)
+    export("casket", max_px=1024)
 
 
-# ── CANDLE: wax pillar in a brass holder, wick, no flame (flame is a shader) ─
-def build_candle():
-    clear()
-    wax = material("Wax", WAX, rough=0.55)
-    brass = material("Brass", BRASS, rough=0.3, metal=1.0)
-    wick = material("Wick", (0.05, 0.04, 0.03), rough=1.0)
-
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.16, depth=0.03, vertices=32, location=(0, 0, 0.015))
-    base = bpy.context.active_object; base.name = "HolderBase"; base.data.materials.append(brass); bevel(base, 0.006, 3)
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.075, depth=0.06, vertices=32, location=(0, 0, 0.06))
-    cup = bpy.context.active_object; cup.name = "HolderCup"; cup.data.materials.append(brass)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.13, minor_radius=0.012, major_segments=32, minor_segments=8,
-                                     location=(0.19, 0, 0.05), rotation=(math.radians(90), 0, 0))
-    ring = bpy.context.active_object; ring.name = "FingerLoop"; ring.data.materials.append(brass)
-    ring.scale = (0.5, 0.5, 0.5)
-
-    # the wax pillar with a sagged top: scale the upper ring down slightly
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.062, depth=0.55, vertices=32, location=(0, 0, 0.36))
-    pillar = bpy.context.active_object; pillar.name = "Wax"; pillar.data.materials.append(wax)
-    bevel(pillar, 0.015, 4)
-    # drips: a few small spheres down one side
-    for i, (a, z, r) in enumerate(((0.3, 0.55, 0.02), (0.6, 0.48, 0.016), (2.2, 0.52, 0.014))):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=r, segments=12, ring_count=8,
-                                             location=(math.cos(a) * 0.062, math.sin(a) * 0.062, z))
-        d = bpy.context.active_object; d.name = f"Drip{i}"; d.data.materials.append(wax); d.scale = (1, 1, 2.2)
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.006, depth=0.05, vertices=8, location=(0, 0, 0.655))
-    w = bpy.context.active_object; w.name = "Wick"; w.data.materials.append(wick)
-    for ob in bpy.context.scene.objects:
-        shade_smooth(ob)
-    export("candle")
-
-
-# ── SKULL: cranium, brow, cheekbones, sunken sockets (no booleans: they fail on overlapping shells) ─
+# ── SKULL: CDmir's CC0 sculpt, textured ─────────────────────────────
 def build_skull():
     clear()
-    bone = material("Bone", BONE, rough=0.75)
-    dark = material("Socket", (0.015, 0.015, 0.015), rough=1.0)
-
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.5, segments=40, ring_count=24, location=(0, 0, 0.55))
-    cr = bpy.context.active_object; cr.name = "Cranium"; cr.data.materials.append(bone)
-    cr.scale = (0.9, 1.05, 1.0)
-    # brow ridge
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0.36, 0.56))
-    brow = bpy.context.active_object; brow.name = "Brow"; brow.scale = (0.74, 0.3, 0.14); brow.data.materials.append(bone)
-    bevel(brow, 0.06, 4)
-    # upper face / maxilla
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0.3, 0.2))
-    face = bpy.context.active_object; face.name = "Face"; face.scale = (0.6, 0.44, 0.5); face.data.materials.append(bone)
-    bevel(face, 0.12, 5)
-    # cheekbones
-    for sx in (-1, 1):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.12, segments=16, ring_count=10, location=(sx * 0.33, 0.4, 0.3))
-        c = bpy.context.active_object; c.name = f"Cheek{sx}"; c.data.materials.append(bone); c.scale = (1, 0.8, 0.8)
-    # sunken eye sockets: shallow black domes sitting just proud of the face
-    for sx in (-1, 1):
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.14, segments=20, ring_count=12, location=(sx * 0.2, 0.5, 0.42))
-        s = bpy.context.active_object; s.name = f"Socket{sx}"; s.data.materials.append(dark); s.scale = (1, 0.35, 1.15)
-        # bone rim around each socket
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.15, minor_radius=0.035, major_segments=24, minor_segments=10,
-                                         location=(sx * 0.2, 0.52, 0.42), rotation=(math.radians(90), 0, 0))
-        r = bpy.context.active_object; r.name = f"Rim{sx}"; r.data.materials.append(bone); r.scale = (1, 1.15, 1)
-    # nasal cavity: black inverted triangle
-    nose = prism("Nose", [(-0.07, 0.0), (0.07, 0.0), (0.0, -0.2)], 0.03, dark)
-    nose.rotation_euler = (math.radians(90), 0, 0); nose.location = (0, 0.56, 0.3)
-    # teeth row and jaw
-    for i in range(-3, 4):
-        bpy.ops.mesh.primitive_cube_add(size=1, location=(i * 0.075, 0.5, -0.06))
-        t = bpy.context.active_object; t.name = f"Tooth{i}"; t.scale = (0.055, 0.06, 0.09); t.data.materials.append(bone)
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0.3, -0.2))
-    jaw = bpy.context.active_object; jaw.name = "Jaw"; jaw.scale = (0.58, 0.44, 0.14); jaw.data.materials.append(bone)
-    bevel(jaw, 0.06, 4)
-    for ob in bpy.context.scene.objects:
-        shade_smooth(ob)
-    export("skull")
+    sk = os.path.join(SRC, "skull")
+    bpy.ops.wm.obj_import(filepath=os.path.join(sk, "skull-Low4K.obj"))
+    objs = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+    skull = join(objs, "Skull") if len(objs) > 1 else objs[0]
+    skull.name = "Skull"
+    mat = pbr_material("Bone", diff=f"{sk}/Skull-Low.jpg", nor=f"{sk}/Skull-Low-normal.jpg", rough_map=f"{sk}/Skull-Low_r.jpg", ao=f"{sk}/Skull-AO.jpg", normal_strength=0.8)
+    skull.data.materials.clear()
+    skull.data.materials.append(mat)
+    # normalise: 0.22 m tall, resting on z = 0, facing +y (OBJ from Blender is y-forward)
+    bpy.context.view_layer.objects.active = skull
+    skull.select_set(True)
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    lo = Vector((min(v.co.x for v in skull.data.vertices), min(v.co.y for v in skull.data.vertices), min(v.co.z for v in skull.data.vertices)))
+    hi = Vector((max(v.co.x for v in skull.data.vertices), max(v.co.y for v in skull.data.vertices), max(v.co.z for v in skull.data.vertices)))
+    size = hi - lo
+    s = 0.22 / size.z
+    skull.data.transform(Matrix.Translation(-Vector(((lo.x + hi.x) / 2, (lo.y + hi.y) / 2, lo.z))) )
+    skull.data.transform(Matrix.Scale(s, 4))
+    print("skull dims", [round(v * s, 3) for v in size])
+    smooth(skull, 60)
+    export("skull", max_px=1024)
 
 
-# ── SHOVEL: iron blade, ash handle, D grip ─
-def build_shovel():
+# ── Poly Haven props: import glTF, trim, export ─────────────────────
+def import_gltf(path):
+    bpy.ops.import_scene.gltf(filepath=path)
+    return [o for o in bpy.context.scene.objects]
+
+
+def build_candle():
     clear()
-    iron = material("Iron", IRON, rough=0.5, metal=0.9)
-    ash = material("Ash", (0.30, 0.20, 0.11), rough=0.7)
-    blade = prism("Blade", [(-0.16, 0.0), (0.16, 0.0), (0.14, -0.30), (0.0, -0.40), (-0.14, -0.30)], 0.012, iron)
-    bevel(blade, 0.008, 2)
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.022, depth=1.25, vertices=16, location=(0, 0.62, 0.0), rotation=(math.radians(90), 0, 0))
-    h = bpy.context.active_object; h.name = "Handle"; h.data.materials.append(ash)
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.032, depth=0.18, vertices=16, location=(0, 0.08, 0.0), rotation=(math.radians(90), 0, 0))
-    s = bpy.context.active_object; s.name = "Socket"; s.data.materials.append(iron)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.08, minor_radius=0.018, major_segments=24, minor_segments=8,
-                                     location=(0, 1.3, 0), rotation=(0, 0, 0))
-    g = bpy.context.active_object; g.name = "Grip"; g.data.materials.append(ash); g.scale = (1, 0.8, 1)
-    for ob in bpy.context.scene.objects:
-        shade_smooth(ob)
-    export("shovel")
+    import_gltf(os.path.join(SRC, "brass_candleholders", "brass_candleholders_1k.gltf"))
+    # keep holder 02 (the taller single stick) with its candle; drop the others and any flame card
+    root = next(o for o in bpy.context.scene.objects if o.name.startswith("brass_candleholder_02"))
+    keep_names = {root.name} | {c.name for c in root.children_recursive}
+    for o in list(bpy.context.scene.objects):
+        if o.name not in keep_names:
+            bpy.data.objects.remove(o, do_unlink=True)
+    # the flame is a textured card inside the same mesh: strip those faces, keep the holder and candle
+    for o in list(bpy.context.scene.objects):
+        if o.type != "MESH":
+            continue
+        flame_idx = {i for i, m in enumerate(o.data.materials) if m and "flame" in m.name}
+        if not flame_idx:
+            continue
+        bm = bmesh.new(); bm.from_mesh(o.data)
+        bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.material_index in flame_idx], context="FACES")
+        bm.to_mesh(o.data); bm.free()
+        for i in sorted(flame_idx, reverse=True):
+            o.data.materials.pop(index=i)
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
+    pts = [o.matrix_world @ Vector(c) for o in meshes for c in o.bound_box]
+    minz = min(p.z for p in pts); cx = (min(p.x for p in pts) + max(p.x for p in pts)) / 2; cy = (min(p.y for p in pts) + max(p.y for p in pts)) / 2
+    for o in bpy.context.scene.objects:
+        if o.parent is None:
+            o.location -= Vector((cx, cy, minz))
+    bpy.context.view_layer.update()
+    pts = [o.matrix_world @ Vector(c) for o in meshes for c in o.bound_box]
+    print("candle size", round(max(p.x for p in pts) - min(p.x for p in pts), 3), "top z", round(max(p.z for p in pts), 3))
+    export("candle", max_px=512)
 
 
-# ── BELL: brass funeral bell on an iron yoke ─
+def build_spade():
+    clear()
+    objs = import_gltf(os.path.join(SRC, "rusted_spade_01", "rusted_spade_01_1k.gltf"))
+    export("spade", max_px=512)
+
+
+def build_lantern():
+    clear()
+    objs = import_gltf(os.path.join(SRC, "Lantern_01", "Lantern_01_1k.gltf"))
+    export("lantern", max_px=512)
+
+
+# ── BELL: lathed brass with a thick lip and an iron crown ───────────
 def build_bell():
     clear()
-    brass = material("Brass", BRASS, rough=0.28, metal=1.0)
-    iron = material("Iron", IRON, rough=0.6, metal=0.8)
-    # lathe a bell profile
-    prof = [(0.0, 0.0), (0.22, 0.0), (0.24, 0.04), (0.21, 0.10), (0.17, 0.30), (0.15, 0.46), (0.10, 0.52), (0.0, 0.54)]
+    brass = pbr_material("Brass", color=(0.74, 0.55, 0.22), rough=0.28, metal=1.0)
+    iron = pbr_material("Iron", color=(0.12, 0.12, 0.13), rough=0.6, metal=0.9)
+    prof = [(0.0, 0.0), (0.235, 0.0), (0.25, 0.03), (0.235, 0.075), (0.2, 0.12), (0.17, 0.26), (0.155, 0.40), (0.125, 0.48), (0.08, 0.53), (0.045, 0.555), (0.0, 0.56),
+            (0.0, 0.5), (0.04, 0.5), (0.1, 0.47), (0.145, 0.4), (0.16, 0.26), (0.19, 0.12), (0.215, 0.04), (0.2, 0.0), (0.0, 0.0)]
     bm = bmesh.new()
-    segs = 40
+    segs = 48
     rings = []
     for (r, z) in prof:
-        ring = []
-        for i in range(segs):
-            a = 2 * math.pi * i / segs
-            ring.append(bm.verts.new((r * math.cos(a), r * math.sin(a), z)) if r > 0 else None)
-        rings.append(ring)
-    # collapse the zero-radius rings to single verts
-    for k in (0, len(prof) - 1):
-        v = bm.verts.new((0, 0, prof[k][1]))
-        rings[k] = [v] * segs
+        rings.append([bm.verts.new((r * math.cos(2 * math.pi * i / segs), r * math.sin(2 * math.pi * i / segs), z)) for i in range(segs)])
     for a, b in zip(rings[:-1], rings[1:]):
         for i in range(segs):
             j = (i + 1) % segs
-            quad = [a[i], a[j], b[j], b[i]]
-            uniq = []
-            for q in quad:
-                if q not in uniq:
-                    uniq.append(q)
-            if len(uniq) >= 3:
+            quad = []
+            for q in (a[i], a[j], b[j], b[i]):
+                if q not in quad:
+                    quad.append(q)
+            if len(quad) >= 3:
                 try:
-                    bm.faces.new(uniq)
+                    bm.faces.new(quad)
                 except ValueError:
                     pass
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-4)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
-    bell = new_mesh_obj("Bell", bm, brass)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.035, segments=16, ring_count=10, location=(0, 0, 0.07))
+    bell = new_obj("Bell", bm, brass)
+    cube_uv(bell)
+    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.04, segments=20, ring_count=12, location=(0, 0, 0.09))
     cl = bpy.context.active_object; cl.name = "Clapper"; cl.data.materials.append(iron)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.05, minor_radius=0.012, major_segments=20, minor_segments=8,
-                                     location=(0, 0, 0.58), rotation=(math.radians(90), 0, 0))
-    loop = bpy.context.active_object; loop.name = "Crown"; loop.data.materials.append(iron)
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.006, depth=0.42, vertices=10, location=(0, 0, 0.3))
+    rod = bpy.context.active_object; rod.name = "ClapperRod"; rod.data.materials.append(iron)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.05, minor_radius=0.011, major_segments=24, minor_segments=10,
+                                     location=(0, 0, 0.6), rotation=(math.radians(90), 0, 0))
+    crown = bpy.context.active_object; crown.name = "Crown"; crown.data.materials.append(iron)
     for ob in bpy.context.scene.objects:
-        shade_smooth(ob)
+        smooth(ob, 45)
     export("bell")
 
 
 if __name__ == "__main__":
-    only = sys.argv[sys.argv.index("--") + 2:] if "--" in sys.argv else []
-    for n, fn in (("casket", build_casket), ("candle", build_candle), ("skull", build_skull), ("shovel", build_shovel), ("bell", build_bell)):
-        if not only or n in only:
+    for n, fn in (("casket", build_casket), ("skull", build_skull), ("candle", build_candle), ("spade", build_spade), ("lantern", build_lantern), ("bell", build_bell)):
+        if not ONLY or n in ONLY:
             fn()

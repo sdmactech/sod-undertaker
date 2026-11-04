@@ -8,8 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/static/css/style.css" />
-  <link rel="stylesheet" href="/static/css/fx.css" />
+  <link rel="stylesheet" href="/static/css/style.css?v={{ v }}" />
+  <link rel="stylesheet" href="/static/css/fx.css?v={{ v }}" />
   <script>document.documentElement.dataset.fxjs='1';setTimeout(function(){delete document.documentElement.dataset.fxjs},1500);try{var m=localStorage.getItem('fx');if(m==='full'&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.dataset.fx='full';}catch(e){}</script>
 </head>
 <body>
@@ -43,7 +43,7 @@
 
 <div class="frame">
 
-  <!-- ─── Masthead ─── -->
+  <!-- ─── Masthead (stays put) ─── -->
   <header class="masthead">
     <div class="mast-id">
       <span class="sq sq-lg" aria-hidden="true"><svg><use href="#i-coffin"/></svg></span>
@@ -64,49 +64,38 @@
     </div>
   </header>
 
-  <!-- ─── Hero: the parlour table ─── -->
+  <div class="pinned">
+  <!-- ─── Hero: the parlour table (pinned; the ledger scrolls over it) ─── -->
   <section class="hero" aria-label="The parlour">
     <div class="stage stage-css" aria-hidden="true">
-      <div class="candle-css l"><span class="glow"></span></div>
-      <div class="candle-css r"><span class="glow"></span></div>
-      <div class="casket-css">
-        <div class="c3">
-          <div class="c-shadow"></div>
-          <div class="c-body">
-            <svg viewBox="0 0 200 100" preserveAspectRatio="none"><polygon points="12,50 40,8 150,2 198,50 150,98 40,92"/></svg>
-            <svg class="handle" viewBox="0 0 200 100" preserveAspectRatio="none"><circle cx="60" cy="18" r="4"/><circle cx="110" cy="12" r="4"/><circle cx="60" cy="82" r="4"/><circle cx="110" cy="88" r="4"/></svg>
-          </div>
-          <div class="c-inner">
-            <svg viewBox="0 0 200 100" preserveAspectRatio="none"><polygon points="22,50 46,16 146,10 186,50 146,90 46,84"/>
-              <g class="skull" transform="translate(150 50)"><ellipse rx="13" ry="12" cy="-3"/><rect x="-9" y="5" width="18" height="9" rx="2"/><circle cx="-5" cy="-4" r="3" fill="#230a0c"/><circle cx="5" cy="-4" r="3" fill="#230a0c"/><path d="M-1 1l1 3 1-3z" fill="#230a0c"/></g>
-            </svg>
-          </div>
-          <div class="c-lid">
-            <svg viewBox="0 0 200 100" preserveAspectRatio="none"><defs><linearGradient id="lidWood" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4a3119"/><stop offset=".45" stop-color="#2e1d10"/><stop offset="1" stop-color="#1c1109"/></linearGradient></defs><polygon class="edge" points="12,52 40,10 150,4 198,52 150,100 40,94"/><polygon points="12,50 40,8 150,2 198,50 150,98 40,92"/>
-              <g class="cross"><rect x="60" y="46" width="90" height="8" rx="1"/><rect x="86" y="30" width="8" height="40" rx="1"/></g>
-            </svg>
-          </div>
-        </div>
+      <div class="sprite candelabra"><img src="/static/img/candle.png" alt="" draggable="false" />
+        <i class="flame f1"></i><i class="flame f2"></i><i class="flame f3"></i><span class="glow"></span></div>
+      <div class="sprite skull"><img src="/static/img/skull.png" alt="" draggable="false" /></div>
+      <div class="sprite casket" data-casket>
+        <img class="casket-body" src="/static/img/casket_body.png" alt="" draggable="false" />
+        <img class="casket-lid" src="/static/img/casket_lid.png" alt="" draggable="false" />
       </div>
+      <div class="sprite lantern-prop"><img src="/static/img/lantern.png" alt="" draggable="false" /><span class="glow"></span></div>
     </div>
     <div class="stage stage-3d" id="stage3d" aria-hidden="true"><canvas></canvas><div class="veil">Lighting the parlour</div></div>
     <div class="fog" aria-hidden="true"></div><div class="fog fog-2" aria-hidden="true"></div>
     <div class="dust" aria-hidden="true"></div>
-  <section class="org">
-    <span class="org-kicker">Profession</span>
-    <h1 class="org-title">The Undertaker</h1>
-    <div class="org-meta">
-      <span><svg><use href="#i-pin"/></svg>Saint Denis</span>
-      <span class="sep" aria-hidden="true"></span>
-      <span><svg><use href="#i-coffin"/></svg><span id="orgCount">—</span></span>
-      <span class="sep" aria-hidden="true"></span>
-      <span class="badge">Helix “Ghost” Solus</span>
-    </div>
-  </section>
-    <span class="hero-hint">Scroll to open the casket</span>
     <div class="lantern" aria-hidden="true"></div>
+    <section class="org">
+      <span class="org-kicker">Profession</span>
+      <h1 class="org-title">The Undertaker</h1>
+      <div class="org-meta">
+        <span><svg><use href="#i-pin"/></svg>Saint Denis</span>
+        <span class="sep" aria-hidden="true"></span>
+        <span><svg><use href="#i-coffin"/></svg><span id="orgCount">—</span></span>
+        <span class="sep" aria-hidden="true"></span>
+        <span class="badge">Helix “Ghost” Solus</span>
+      </div>
+    </section>
   </section>
+  </div><!-- /pinned -->
 
+  <div class="ledger">
   <!-- ─── Section bar ─── -->
   <div class="section-bar">
     <h2 id="viewTitle">Parlour overview</h2>
@@ -248,6 +237,7 @@
     </section>
 
   </main>
+  </div><!-- /ledger -->
 </div>
 
 <!-- ─── Tab bar (narrow screens) ─── -->
@@ -327,7 +317,7 @@
 
 <div class="status" id="status" role="status" aria-live="polite"></div>
 
-<script src="/static/js/app.js"></script>
-<script type="module" src="/static/js/fx.js"></script>
+<script src="/static/js/app.js?v={{ v }}"></script>
+<script type="module" src="/static/js/fx.js?v={{ v }}"></script>
 </body>
 </html>
