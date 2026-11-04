@@ -621,7 +621,7 @@ async function saveIngStock(e) {
     renderStock();
     const el = $(`[data-ing="${row.id}"]`);
     if (el) { el.scrollIntoView({ block: 'center', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
-      el.animate([{ background: 'var(--brass-soft)' }, { background: 'transparent' }], { duration: 1400, easing: 'ease-out' }); }
+      el.animate([{ background: 'var(--teal-bg)' }, { background: 'transparent' }], { duration: 1400, easing: 'ease-out' }); }
   } catch (err) { status(`Could not add: ${err.message}`, 'error'); }
 }
 

@@ -39,11 +39,13 @@ async function setMode(mode, { save = true } = {}) {
   if (btn) btn.setAttribute('aria-pressed', mode === 'full');
   if (mode === 'full') {
     if (!scene && !sceneLoading) {
+      const fail = err => { console.error('3D scene failed, falling back', err); sceneLoading = null; scene?.dispose(); scene = null; setMode('light'); };
       sceneLoading = import('./scene3d.js').then(m => {
-        scene = m.createScene($('#stage3d'), { onCreak: () => sound.play('creak'), onReady: () => $('#stage3d').classList.add('ready') });
+        scene = m.createScene($('#stage3d'), { onCreak: () => sound.play('creak'), onReady: () => $('#stage3d').classList.add('ready'), onError: fail });
         scene.setOpen(openAmount);
+        if (root.dataset.fx !== 'full') scene.pause();
         return scene;
-      }).catch(err => { console.error('3D scene failed, falling back', err); setMode('light'); });
+      }).catch(fail);
     } else if (scene) scene.resume();
     $('.lantern')?.classList.add('on');
   } else {
@@ -99,19 +101,20 @@ const sound = (() => {
     on = enabled;
     root.dataset.sound = on ? 'on' : 'off';
     if (save) store.set('sound', on ? 'on' : 'off');
-    $('#fxSound')?.setAttribute('aria-pressed', on);
     if (on) { await ensureCtx(); flame(true); play('bell', { vol: .6 }); $('.masthead')?.classList.add('toll'); setTimeout(() => $('.masthead')?.classList.remove('toll'), 1700); }
     else flame(false);
+    $('#fxSound')?.setAttribute('aria-pressed', on && unlocked);
   }
+  document.addEventListener('visibilitychange', () => { if (!on) return; if (document.hidden) flame(false); else flame(true); });
   return { play, set, flame, get on() { return on; } };
 })();
 
 /* ═══════════════ HERO: title letters, casket, dust ═══════════════ */
 function splitTitle() {
   const t = $('.org-title'); if (!t || t.dataset.split) return;
-  const text = t.textContent; t.dataset.split = '1'; t.setAttribute('aria-label', text);
+  const text = t.textContent; t.dataset.split = '1';
   let i = 0;
-  t.innerHTML = text.split(' ').map(word => `<span class="word" aria-hidden="true">${[...word].map(ch => `<span class="ch" style="--i:${i++}">${ch}</span>`).join('')}</span>`).join('<span class="ch sp" aria-hidden="true"> </span>');
+  t.innerHTML = `<span class="sr-only">${text}</span>` + text.split(' ').map(word => `<span class="word" aria-hidden="true">${[...word].map(ch => `<span class="ch" style="--i:${i++}">${ch}</span>`).join('')}</span>`).join('<span class="ch sp" aria-hidden="true"> </span>');
 }
 
 function seedDust(el, n = 26) {
@@ -127,7 +130,7 @@ function seedDust(el, n = 26) {
 let openAmount = 0;
 let lastCreakAt = -1;
 function onScroll() {
-  const hero = $('.hero'); if (!hero) return;
+  const hero = $('.hero'); if (!hero || reduced.matches) return;
   const h = hero.offsetHeight || 1;
   const y = Math.max(0, Math.min(1, window.scrollY / (h * .55)));
   const eased = y < .5 ? 2 * y * y : 1 - Math.pow(-2 * y + 2, 2) / 2;
@@ -142,17 +145,20 @@ function onScroll() {
 function bindCasketHover() {
   const c = $('.casket-css'); if (!c) return;
   let t;
-  c.addEventListener('pointerenter', () => { if (!canHover.matches) return; c.classList.add('hover'); sound.play('creak', { rate: 1.15, vol: .5 }); clearTimeout(t); t = setTimeout(() => c.classList.remove('hover'), 950); });
-  c.addEventListener('click', () => { c.classList.toggle('open'); sound.play('creak'); });
+  c.addEventListener('pointerenter', () => { if (!canHover.matches || reduced.matches) return; c.classList.add('hover'); sound.play('creak', { rate: 1.15, vol: .5 }); clearTimeout(t); t = setTimeout(() => c.classList.remove('hover'), 950); });
 }
 
 /* lantern follows the pointer */
 function bindLantern() {
-  const l = $('.lantern'); if (!l || !canHover.matches) return;
-  let raf = 0, x = innerWidth / 2, y = innerHeight * .3;
+  const l = $('.lantern'), hero = $('.hero'); if (!l || !hero || !canHover.matches) return;
+  let raf = 0, x = 0, y = 0;
   window.addEventListener('pointermove', e => {
     x = e.clientX; y = e.clientY;
-    if (!raf) raf = requestAnimationFrame(() => { l.style.setProperty('--lx', `${x}px`); l.style.setProperty('--ly', `${y}px`); scene?.setPointer(x / innerWidth, y / innerHeight); raf = 0; });
+    if (!raf) raf = requestAnimationFrame(() => {
+      const r = hero.getBoundingClientRect();
+      l.style.setProperty('--lx', `${x - r.left}px`); l.style.setProperty('--ly', `${y - r.top}px`);
+      scene?.setPointer(x / innerWidth, y / innerHeight); raf = 0;
+    });
   }, { passive: true });
 }
 
@@ -171,7 +177,7 @@ function spawn(cls, x, y, n, vars) {
 }
 function coins(at, count = 1) {
   const r = at.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
-  spawn('coin', x, y, Math.min(3, count), { '--dx': () => `${(Math.random() - .5) * 46}px` });
+  spawn('coin', x, y, 1, { '--dx': () => `${(Math.random() - .5) * 30}px` });
   sound.play('coin', { rate: .95 + Math.random() * .15 });
 }
 function dust(at) {
@@ -189,11 +195,16 @@ let sealed = false;
 function sealBill() {
   const bill = $('.bill'), wax = $('.seal-wax'); if (!bill || !wax) return;
   const picked = document.querySelectorAll('.pick[aria-pressed="true"]').length;
-  if (!picked) { bill.classList.remove('bill-shake'); void bill.offsetWidth; bill.classList.add('bill-shake'); return; }
+  if (!picked) { bill.classList.remove('bill-shake'); void bill.offsetWidth; bill.classList.add('bill-shake'); note('Pick at least one item before sealing.'); return; }
   wax.classList.remove('stamp', 'hold'); void wax.offsetWidth; wax.classList.add('stamp');
   bill.classList.add('sealed'); sealed = true;
-  sound.play('seal');
+  sound.play('seal'); note('Bill sealed.');
   $('#btnSeal')?.setAttribute('aria-pressed', 'true');
+}
+function note(msg) {
+  const el = $('#status'); if (!el) return;
+  el.textContent = msg; el.className = 'status show';
+  clearTimeout(note._t); note._t = setTimeout(() => { el.className = 'status'; }, 2200);
 }
 function unseal() {
   const bill = $('.bill'), wax = $('.seal-wax'); if (!sealed || !wax) return;
@@ -209,12 +220,17 @@ function markLow() {
   for (const st of $$('.stepper.zero')) { st.closest('.card')?.classList.add('out'); st.closest('.row')?.classList.add('out'); }
   for (const st of $$('.stepper:not(.zero)')) { st.closest('.card')?.classList.remove('out'); st.closest('.row')?.classList.remove('out'); }
 }
-new MutationObserver(() => { clearTimeout(markLow._t); markLow._t = setTimeout(markLow, 30); }).observe($('.main'), { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+/* stagger panels and cards as they render: capped so late cards never wait */
+function stagger() { $$('.view:not([hidden]) .panel, .view:not([hidden]) .card').forEach((el, i) => el.style.setProperty('--i', Math.min(i, 6))); }
+let renderT = 0;
+function afterRender() { clearTimeout(renderT); renderT = setTimeout(() => { markLow(); stagger(); }, 20); }
+document.addEventListener('ledger:view', afterRender);
+document.addEventListener('ledger:qty', () => requestAnimationFrame(markLow));
+new MutationObserver(afterRender).observe($('.main'), { childList: true, subtree: true });
 
-/* stagger panels and cards as they render */
-function stagger() { $$('.view:not([hidden]) .panel, .view:not([hidden]) .card').forEach((el, i) => el.style.setProperty('--i', i)); }
-document.addEventListener('ledger:view', stagger);
-new MutationObserver(stagger).observe($('.main'), { childList: true, subtree: true });
+/* the hero's ambience only runs while it is on screen */
+new IntersectionObserver(([en]) => { $('.hero')?.classList.toggle('inview', en.isIntersecting); if (!en.isIntersecting) sound.flame(false); else if (sound.on) sound.flame(true); }, { threshold: 0.02 }).observe($('.hero'));
+reduced.addEventListener('change', e => { if (e.matches) { setMode('light', { save: false }); const b = $('#fxMode'); if (b) { b.disabled = true; b.title = 'Reduced motion is on'; } } });
 
 /* ═══════════════ CONTROLS + INIT ═══════════════ */
 $('#fxMode')?.addEventListener('click', () => setMode(root.dataset.fx === 'full' ? 'light' : 'full'));
@@ -231,8 +247,6 @@ markLow(); stagger();
 
 setMode(store.get('fx', 'light'), { save: false });
 if (store.get('sound', 'off') === 'on') {
-  // the browser needs a gesture before sound; arm it on the first click or key
-  const arm = () => { sound.set(true, { save: false }); window.removeEventListener('pointerdown', arm); window.removeEventListener('keydown', arm); };
-  window.addEventListener('pointerdown', arm, { once: true }); window.addEventListener('keydown', arm, { once: true });
-  $('#fxSound')?.setAttribute('aria-pressed', 'true');
+  // the browser needs a gesture before sound; arm it on the first pointer press
+  window.addEventListener('pointerdown', () => sound.set(true, { save: false }), { once: true });
 }

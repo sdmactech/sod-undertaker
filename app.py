@@ -16,6 +16,8 @@ elif DATABASE_URL.startswith('postgresql://'):
 app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'sod-undertaker-slimm-brinkman-2024')
+# Static files (three.js, models, audio) may be cached for an hour; a deploy swaps the folder, so an hour is the longest stale window
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600
 
 db = SQLAlchemy(app)
 

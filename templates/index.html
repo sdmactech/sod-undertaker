@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/style.css" />
   <link rel="stylesheet" href="/static/css/fx.css" />
-  <script>try{var m=localStorage.getItem('fx');if(m==='full'&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.dataset.fx='full';}catch(e){}</script>
+  <script>document.documentElement.dataset.fxjs='1';setTimeout(function(){delete document.documentElement.dataset.fxjs},1500);try{var m=localStorage.getItem('fx');if(m==='full'&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.dataset.fx='full';}catch(e){}</script>
 </head>
 <body>
 
@@ -59,8 +59,8 @@
       <button class="nav-btn" data-view="payout"><svg><use href="#i-scales"/></svg><span>Burial payout</span></button>
     </nav>
     <div class="fx-controls">
-      <button class="fx-toggle" id="fxMode" aria-pressed="false" title="Switch between the light effects and the full 3D stage"><svg><use href="#i-cube"/></svg><span class="lbl-off">Light</span><span class="lbl-on">Full 3D</span></button>
-      <button class="fx-toggle" id="fxSound" aria-pressed="false" title="Sound: coffin creaks, candles, coins and the seal"><svg><use href="#i-sound"/></svg><span class="lbl-off">Muted</span><span class="lbl-on">Sound</span></button>
+      <button class="fx-toggle" id="fxMode" aria-pressed="false" aria-label="Full 3D stage" title="Switch between the light effects and the full 3D stage"><svg><use href="#i-cube"/></svg><span class="lbl-off">Light</span><span class="lbl-on">Full 3D</span></button>
+      <button class="fx-toggle" id="fxSound" aria-pressed="false" aria-label="Sound effects" title="Sound: coffin creaks, candles, coins and the seal"><svg><use href="#i-sound"/></svg><span class="lbl-off">Muted</span><span class="lbl-on">Sound</span></button>
     </div>
   </header>
 
@@ -69,7 +69,7 @@
     <div class="stage stage-css" aria-hidden="true">
       <div class="candle-css l"><span class="glow"></span></div>
       <div class="candle-css r"><span class="glow"></span></div>
-      <div class="casket-css" title="The casket">
+      <div class="casket-css">
         <div class="c3">
           <div class="c-shadow"></div>
           <div class="c-body">
@@ -104,6 +104,7 @@
     </div>
   </section>
     <span class="hero-hint">Scroll to open the casket</span>
+    <div class="lantern" aria-hidden="true"></div>
   </section>
 
   <!-- ─── Section bar ─── -->
@@ -228,17 +229,19 @@
             <h3>Bill of burial</h3>
           </header>
           <div class="bill-lines" id="billLines"></div>
-          <div class="bill-total"><span>Total payout</span><span class="money" id="billTotal">$15</span></div>
+          <div class="bill-total"><span>Total payout</span><span class="money" id="billTotal">$15</span>
+            <svg class="seal-wax" viewBox="0 0 100 100" aria-hidden="true">
+              <path class="blob" d="M50 6c9 0 14 6 22 8 8 2 16 6 18 15 2 9-3 15 0 24 3 9-2 17-10 22-8 5-14 14-24 14S30 83 22 78c-8-5-14-12-12-21 2-9-2-16 0-25 2-9 10-13 18-15 8-2 13-11 22-11z"/>
+              <path class="emboss-dark" d="M50 22c-14 0-25 11-25 25s11 25 25 25 25-11 25-25-11-25-25-25z"/>
+              <path class="emboss" d="M50 20c-14 0-25 11-25 25s11 25 25 25 25-11 25-25-11-25-25-25z"/>
+              <path class="emboss" d="M43 36h14l5 9-5 20H43l-5-20z"/>
+            </svg>
+          </div>
           <div class="bill-sub"><span>Est. cost of goods</span><span id="billCost">—</span></div>
           <div class="bill-sub" id="billProfitRow" hidden><span>Est. profit</span><span id="billProfit">—</span></div>
           <button class="btn btn-active btn-seal" id="btnSeal" aria-pressed="false"><svg><use href="#i-seal"/></svg>Seal the bill</button>
+          <p class="seal-note">The seal is for show. Nothing is saved.</p>
           <button class="btn bill-clear" id="billClear">Clear selection</button>
-          <svg class="seal-wax" viewBox="0 0 100 100" aria-hidden="true">
-            <path class="blob" d="M50 6c9 0 14 6 22 8 8 2 16 6 18 15 2 9-3 15 0 24 3 9-2 17-10 22-8 5-14 14-24 14S30 83 22 78c-8-5-14-12-12-21 2-9-2-16 0-25 2-9 10-13 18-15 8-2 13-11 22-11z"/>
-            <path class="emboss-dark" d="M50 22c-14 0-25 11-25 25s11 25 25 25 25-11 25-25-11-25-25-25z"/>
-            <path class="emboss" d="M50 20c-14 0-25 11-25 25s11 25 25 25 25-11 25-25-11-25-25-25z"/>
-            <path class="emboss" d="M43 36h14l5 9-5 20H43l-5-20z"/>
-          </svg>
         </aside>
       </div>
       <div class="payout-dock" aria-hidden="true"><span>Total payout</span><span class="money" id="dockTotal">$15</span></div>
@@ -323,7 +326,6 @@
 </section>
 
 <div class="status" id="status" role="status" aria-live="polite"></div>
-<div class="lantern" aria-hidden="true"></div>
 
 <script src="/static/js/app.js"></script>
 <script type="module" src="/static/js/fx.js"></script>

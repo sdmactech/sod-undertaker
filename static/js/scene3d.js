@@ -11,14 +11,16 @@ import { GLTFLoader } from '../vendor/three/GLTFLoader.js';
 
 const MODELS = '/static/models/';
 
-export function createScene(host, { onCreak, onReady } = {}) {
+export function createScene(host, { onCreak, onReady, onError } = {}) {
   const canvas = host.querySelector('canvas');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'high-performance' });
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+  // phones and small screens get a lighter tier: no shadows, no antialias, 1x pixels, fewer motes
+  const lite = matchMedia('(pointer: coarse)').matches || host.clientWidth < 640;
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !lite, alpha: true, powerPreference: 'default' });
+  renderer.setPixelRatio(lite ? 1 : Math.min(devicePixelRatio, 1.75));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
-  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.enabled = !lite;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
   const scene = new THREE.Scene();
@@ -49,7 +51,7 @@ export function createScene(host, { onCreak, onReady } = {}) {
   for (let i = -6; i <= 6; i++) { const p = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.004, 10), plankMat); p.position.set(i * 0.9, 0.002, 0); scene.add(p); }
 
   /* ── dust ── */
-  const N = 260;
+  const N = lite ? 90 : 260;
   const pos = new Float32Array(N * 3), vel = new Float32Array(N);
   for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - .5) * 7; pos[i * 3 + 1] = Math.random() * 2.6; pos[i * 3 + 2] = (Math.random() - .5) * 5; vel[i] = .04 + Math.random() * .08; }
   const dustGeo = new THREE.BufferGeometry(); dustGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
@@ -82,7 +84,7 @@ export function createScene(host, { onCreak, onReady } = {}) {
     for (const [x, z, s] of [[-1.65, 0.55, 1], [1.5, -0.3, 0.82]]) {
       const c = candle.clone(true); tune(c); c.position.set(x, 0, z); c.scale.setScalar(s); group.add(c);
       const flame = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.16, 10), flameMat); flame.position.set(x, 0.66 * s + 0.08, z); group.add(flame);
-      const halo = new THREE.Sprite(haloMat); halo.scale.set(.9, .9, 1); halo.position.copy(flame.position); group.add(halo);
+      const halo = new THREE.Sprite(haloMat.clone()); halo.scale.set(.9, .9, 1); halo.position.copy(flame.position); group.add(halo);
       const light = new THREE.PointLight(0xffa64d, 1.6, 4.5, 1.8); light.position.set(x, 0.66 * s + 0.12, z); light.castShadow = false; group.add(light);
       candleLights.push(light); flames.push({ flame, halo, light, seed: Math.random() * 10 });
     }
@@ -90,7 +92,7 @@ export function createScene(host, { onCreak, onReady } = {}) {
     tune(shovel); shovel.position.set(1.35, 0.03, 0.9); shovel.rotation.set(-Math.PI / 2 + 0.02, 0, 1.25); shovel.scale.setScalar(0.9); group.add(shovel);
     tune(bl); bl.position.set(1.95, 0, 0.75); bl.scale.setScalar(0.5); bell = bl; group.add(bl);
     onReady && onReady();
-  }).catch(err => { console.error(err); onReady && onReady(); });
+  }).catch(err => { console.error(err); onError ? onError(err) : onReady && onReady(); });
 
   /* ── interaction state ── */
   let open = 0, openShown = 0;           // target, displayed
@@ -103,12 +105,11 @@ export function createScene(host, { onCreak, onReady } = {}) {
     const r = canvas.getBoundingClientRect();
     ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
     ray.setFromCamera(ndc, camera);
-    const hit = lid ? ray.intersectObject(group, true).some(h => isUnder(h.object, lid) || isUnder(h.object, lid.parent)) : false;
+    const hit = lid ? ray.intersectObject(lid.parent, true).length > 0 : false;
     if (hit && !hover && performance.now() - creakT > 1200) { creakT = performance.now(); hoverT = performance.now(); onCreak && onCreak(); }
-    hover = hit; canvas.style.cursor = hit ? 'pointer' : '';
+    hover = hit;
   });
   host.addEventListener('pointerleave', () => { hover = false; });
-  function isUnder(o, parent) { while (o) { if (o === parent) return true; o = o.parent; } return false; }
 
   /* ── resize ── */
   function resize() {
@@ -155,8 +156,6 @@ export function createScene(host, { onCreak, onReady } = {}) {
     for (let i = 0; i < N; i++) { p[i * 3 + 1] += vel[i] * dt; p[i * 3] += Math.sin(t * .6 + i) * .0008; if (p[i * 3 + 1] > 2.8) p[i * 3 + 1] = 0; }
     dustGeo.attributes.position.needsUpdate = true;
 
-    if (bell) bell.rotation.z = Math.sin(t * 1.6) * 0.02;
-    if (skull) skull.rotation.y = Math.PI + 0.55 + Math.sin(t * .35) * .04;
 
     renderer.render(scene, camera);
     raf = requestAnimationFrame(frame);
