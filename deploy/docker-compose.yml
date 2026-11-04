@@ -1,4 +1,4 @@
-# SoD Undertaker on MFV. bin/deploy-nas.sh pushes a branch into ./app (v1, main) or ./app-v2 (v2)
+# SoD Undertaker on MFV. bin/deploy-nas.sh pushes a branch into ./app (v1, main), ./app-v2 (v2) or ./app-v3 (v3)
 # and installs its Python packages into <slot>/.deps. No image is built: DSM's kernel has no
 # seccomp, so build RUN steps fail, and running the stock image keeps every step on the
 # passwordless `sudo docker` / `sudo docker-compose` the NAS already allows.
@@ -36,3 +36,15 @@ services:
     volumes:
       - ./app-v2:/app:ro
       - ./data/v2:/data
+
+  sod-undertaker-v3:
+    <<: *common
+    container_name: sod-undertaker-v3
+    ports:
+      - "8096:5050"
+    environment:
+      DATABASE_URL: sqlite:////data/undertaker.db
+      PYTHONPATH: /app/.deps
+    volumes:
+      - ./app-v3:/app:ro
+      - ./data/v3:/data
