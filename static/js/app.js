@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════
-   THE UNDERTAKER'S LEDGER — v2
+   THE UNDERTAKER'S LEDGER — v3 (charter ledger look)
    Helix “Ghost” Solus · Saint Denis · State of Deliverance
    Same API as v1. Motion is spring-driven so every animation
    starts from what is on screen and can be grabbed mid-flight.
@@ -156,7 +156,19 @@ function sortedItems() {
 /* ═══════════════════════════════════════════
    NAVIGATION
    ═══════════════════════════════════════════ */
-const TITLES = { dashboard: 'Overview', items: 'Items', stock: 'Stock', payout: 'Payout' };
+const TITLES = { dashboard: 'Parlour overview', items: 'Item registry', stock: 'Stock room', payout: 'Burial payout' };
+
+function sectionMeta() {
+  const onHand = state.items.filter(i => i.in_stock > 0).length;
+  const text = {
+    dashboard: `${onHand} of ${state.items.length} in stock`,
+    items:     `${state.items.length} items`,
+    stock:     `${state.items.reduce((s, i) => s + (i.in_stock || 0), 0)} goods · ${state.ingStock.reduce((s, r) => s + (r.quantity || 0), 0)} ingredients`,
+    payout:    `${state.picked.size} selected`,
+  }[state.view];
+  $('#sectionMeta').innerHTML = `<span class="dot${onHand ? '' : ' off'}"></span>${esc(text)}`;
+  $('#orgCount').textContent = `${state.items.length} burial goods`;
+}
 
 function setView(name, { push = true } = {}) {
   if (!TITLES[name]) name = 'dashboard';
@@ -172,6 +184,7 @@ function setView(name, { push = true } = {}) {
 }
 
 function render() {
+  sectionMeta();
   if (state.view === 'dashboard') renderDashboard();
   if (state.view === 'items')     renderItems();
   if (state.view === 'stock')     renderStock();
@@ -181,38 +194,30 @@ function render() {
 /* ═══════════════════════════════════════════
    OVERVIEW
    ═══════════════════════════════════════════ */
-function ordinal(n) { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+const cents = n => `$${(Math.round(n * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 function renderDashboard() {
-  const d = new Date();
-  $('#heroDate').textContent = `${d.toLocaleDateString('en-US', { weekday: 'long' })}, the ${ordinal(d.getDate())} of ${d.toLocaleDateString('en-US', { month: 'long' })}`;
-
   const s = computeStats();
-  const count = n => String(Math.round(n));
-  tweenNumber($('[data-stat="total_items"]'), s.total_items, count);
-  tweenNumber($('[data-stat="craftable"]'),   s.craftable,   count);
-  tweenNumber($('[data-stat="total_stock"]'), s.total_stock, count);
-  tweenNumber($('[data-stat="ing_stock"]'),   s.ing_stock,   count);
-  tweenNumber($('[data-stat="max_payout"]'),  s.max_payout);
-  $('[data-stat="best_value"]').textContent = s.best ? s.best.name : '—';
-  $('#bestValueLabel').textContent = s.best ? `Best value · +${s.best.profit_pct}% return` : 'Best value';
+  const value = state.items.reduce((t, i) => t + (i.in_stock || 0) * (i.adds_to_payout || 0), 0);
+  tweenNumber($('#stockValue'), value, cents);
+  $('#financeSub').textContent = `${s.total_stock} burial goods on the shelf · ${s.ing_stock} ingredients stored`;
 
-  const empty = state.items.filter(i => !i.in_stock);
-  $('#emptyCount').textContent = empty.length ? `${empty.length} of ${state.items.length}` : '';
-  $('#dashEmpty').innerHTML = empty.length
-    ? empty.map(i => `<div class="list-row">${glyph(i)}<span class="list-name">${esc(i.name)}</span><span class="list-money">${money(i.adds_to_payout)}</span><span class="qty-pill zero">0</span></div>`).join('')
-    : `<p class="empty">Every burial good is on the shelf.</p>`;
-
-  const onHand = state.items.filter(i => i.in_stock > 0).sort((a, b) => b.in_stock - a.in_stock);
-  $('#dashOnHand').innerHTML = onHand.length
-    ? onHand.map(i => `<div class="list-row">${glyph(i)}<span class="list-name">${esc(i.name)}</span><span class="list-money">${money(i.adds_to_payout)}</span><span class="qty-pill ${i.in_stock >= 3 ? 'good' : ''}">${i.in_stock}</span></div>`).join('')
-    : `<p class="empty">Nothing on the shelf yet. Add stock from the Stock page.</p>`;
+  // Goods roster, in stock first, like a members list with online dots
+  const goods = [...state.items].sort((a, b) => (b.in_stock > 0) - (a.in_stock > 0) || (b.adds_to_payout || 0) - (a.adds_to_payout || 0) || a.name.localeCompare(b.name));
+  $('#goodsCount').textContent = goods.length;
+  $('#dashGoods').innerHTML = goods.length ? goods.slice(0, 7).map(i => `
+    <div class="roster-row">
+      ${glyph(i)}
+      <div class="roster-text"><span class="roster-name">${esc(i.name)}</span><span class="roster-sub">${esc(i.category || '')} · adds ${money(i.adds_to_payout)}</span></div>
+      <span class="roster-qty">${i.in_stock ? `${i.in_stock} on hand` : 'out'}</span>
+      <span class="dot${i.in_stock ? ' on' : ''}" title="${i.in_stock ? 'In stock' : 'Out of stock'}"></span>
+    </div>`).join('') : `<p class="empty">No items registered.</p>`;
 
   const notes = state.items.filter(i => i.notes);
-  $('#notesCount').textContent = notes.length || '';
+  $('#notesCount').textContent = `${notes.length} ${notes.length === 1 ? 'notice' : 'notices'}`;
   $('#dashNotes').innerHTML = notes.length
-    ? notes.map(i => `<div class="note"><div class="note-name">${glyph(i)}${esc(i.name)}</div><div class="note-text">${esc(i.notes)}</div></div>`).join('')
-    : `<p class="empty">No open notes.</p>`;
+    ? notes.map(i => `<div class="notice"><div class="notice-name">${glyph(i)}${esc(i.name)}</div><div class="notice-text">${esc(i.notes)}</div></div>`).join('')
+    : `<div class="empty-state"><span class="ring">${icon('scroll')}</span><h4>No notices</h4><p>Notes added to an item will appear here.</p></div>`;
 }
 
 /* ═══════════════════════════════════════════
@@ -328,6 +333,7 @@ function setQty(kind, id, qty) {
     paintQty(tk, twin.id, qty, true);
   }
   if (state.view === 'dashboard') renderDashboard();
+  sectionMeta();
 
   const key = `${kind}:${id}`;
   clearTimeout(writeTimers.get(key));
@@ -397,6 +403,7 @@ function updateBill() {
     $('#billProfit').innerHTML = `<span class="${profit >= 0 ? 'pos' : 'neg'}">${money(profit)} · ${pct}%</span>`;
   }
   $('#billClear').disabled = !picked.length;
+  sectionMeta();
 }
 
 /* ═══════════════════════════════════════════
@@ -670,6 +677,16 @@ document.addEventListener('click', e => {
     const st = step.closest('.stepper'), kind = st.dataset.kind, id = +st.dataset.id;
     const cur = kind === 'item' ? itemById(id).in_stock : ingById(id).quantity;
     setQty(kind, id, cur + Number(step.dataset.d));
+    return;
+  }
+  const go = e.target.closest('[data-goto]');
+  if (go) {
+    if (go.dataset.sort) {
+      state.sort = go.dataset.sort;
+      $$('#sortControl [data-sort]').forEach(x => x.setAttribute('aria-checked', x.dataset.sort === state.sort));
+    }
+    setView(go.dataset.goto);
+    if (go.dataset.anchor) requestAnimationFrame(() => document.getElementById(go.dataset.anchor).scrollIntoView({ behavior: reducedMotion.matches ? 'auto' : 'smooth', block: 'start' }));
     return;
   }
   const edit = e.target.closest('[data-edit]');
