@@ -270,7 +270,7 @@ window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 markLow(); stagger();
 
-setMode(store.get('fx', 'light'), { save: false });
+setMode(store.get('fx', 'full'), { save: false });   // Full 3D by default; Light stays the fallback
 if (store.get('sound', 'off') === 'on') {
   // the browser needs a gesture before sound; arm it on the first pointer press anywhere
   // except the speaker button itself, whose click already decides

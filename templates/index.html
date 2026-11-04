@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-fx="light" data-sound="off">
+<html lang="en" data-fx="full" data-sound="off">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English+SC&family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Inter:wght@500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/style.css?v={{ v }}" />
   <link rel="stylesheet" href="/static/css/fx.css?v={{ v }}" />
-  <script>document.documentElement.dataset.fxjs='1';setTimeout(function(){delete document.documentElement.dataset.fxjs},1500);try{var m=localStorage.getItem('fx');if(m==='full'&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.dataset.fx='full';}catch(e){}</script>
+  <script>document.documentElement.dataset.fxjs='1';setTimeout(function(){delete document.documentElement.dataset.fxjs},1500);try{var m=localStorage.getItem('fx')||'full';if(m!=='full'||matchMedia('(prefers-reduced-motion: reduce)').matches)document.documentElement.dataset.fx='light';}catch(e){}</script>
 </head>
 <body>
 
