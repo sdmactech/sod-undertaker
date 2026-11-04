@@ -54,7 +54,7 @@ def light_rig(center, size):
         o = bpy.data.objects.new(name, l); bpy.context.collection.objects.link(o); o.location = loc; return o
     point("Key", (1.0, 0.72, 0.42), 260 * size * size, center + Vector((size * 1.3, -size * 1.1, size * 1.2)))
     point("Fill", (0.55, 0.62, 0.7), 50 * size * size, center + Vector((size * 1.6, size * 0.8, size * 0.5)))
-    point("Rim", (0.16, 0.64, 0.74), 160 * size * size, center + Vector((-size * 1.2, size * 1.2, size * 1.4)))
+    point("Rim", (0.3, 0.6, 0.66), 70 * size * size, center + Vector((-size * 1.2, size * 1.2, size * 1.4)))
 
 
 def camera_for(center, size, azimuth_deg, elev_deg, dist_mult, res, ortho=False):

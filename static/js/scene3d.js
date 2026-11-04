@@ -80,7 +80,7 @@ export function createScene(host, { onCreak, onReady, onError } = {}) {
     const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 1 }));
     flame.center.set(0.5, 0.05); flame.scale.set(0.085 * scale, 0.19 * scale, 1); flame.position.set(x, y, z); scene.add(flame);
     const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: .32 }));
-    halo.scale.set(.55 * scale, .55 * scale, 1); halo.position.set(x, y + 0.05 * scale, z); scene.add(halo);
+    halo.scale.set(.3 * scale, .3 * scale, 1); halo.position.set(x, y + 0.05 * scale, z); scene.add(halo);
     flames.push({ flame, halo, seed: Math.random() * 10, base: scale });
     return flame;
   }
@@ -102,7 +102,7 @@ export function createScene(host, { onCreak, onReady, onError } = {}) {
     tune(bell); props.bell = bell; group.add(bell);
     tune(spade); props.spade = spade; group.add(spade);
     const lampLight = new THREE.PointLight(0xffb24a, 4.0, 4.5, 1.6); props.lampLight = lampLight; group.add(lampLight);
-    const casketLight = new THREE.PointLight(0xffc48a, 5.0, 5, 1.5); casketLight.position.set(1.1, 1.2, 1.4); group.add(casketLight);
+    const casketLight = new THREE.PointLight(0xffc48a, 5.5, 5, 1.5); casketLight.position.set(1.3, 1.2, 1.6); group.add(casketLight);
     layout(); onReady && onReady();
   }).catch(err => { console.error(err); onError ? onError(err) : onReady && onReady(); });
 
@@ -112,9 +112,9 @@ export function createScene(host, { onCreak, onReady, onError } = {}) {
     const w = wide();                       // ~7 on a desktop strip, ~2.5 on a phone
     const narrow = w < 4;
     const sp = narrow ? 0.62 : 1;           // squeeze the spread on phones
-    props.casket.position.set(1.7 * sp, 0.0, 0.0); props.casket.rotation.y = -0.38; props.casket.scale.setScalar(0.68);
-    props.candle.position.set(-2.0 * sp, 0, 0.25); props.candle.rotation.y = Math.PI / 2 + 0.25; props.candle.scale.setScalar(0.68);   // arms across the strip; native height 0.70 -> 0.48
-    props.skull.position.set(-0.95 * sp, 0, 0.85); props.skull.rotation.set(0.1, 0.6, 0); props.skull.scale.setScalar(0.25);  // native height 1.31 -> 0.33
+    props.casket.position.set(2.05 * sp, 0.0, 0.15); props.casket.rotation.y = -1.15; props.casket.scale.setScalar(0.8);
+    props.candle.position.set(-2.05 * sp, 0, 0.3); props.candle.rotation.y = 0.18; props.candle.scale.setScalar(0.72);   // arms across the strip; native height 0.70 -> 0.50
+    props.skull.position.set(-1.4 * sp, 0, 0.9); props.skull.rotation.set(0.08, 0.75, 0); props.skull.scale.setScalar(0.6);
     props.lamp.position.set(2.85 * sp, 0, 0.7); props.lamp.rotation.y = -0.4; props.lamp.visible = !narrow;
     props.lampLight.position.set(2.75 * sp, 0.32, 0.75); props.lampLight.visible = !narrow;
     props.bell.position.set(2.45 * sp, 0, 1.0); props.bell.scale.setScalar(0.3); props.bell.visible = !narrow;
@@ -123,7 +123,7 @@ export function createScene(host, { onCreak, onReady, onError } = {}) {
     flames.length = 0;
     const m = new THREE.Matrix4().compose(props.candle.position, new THREE.Quaternion().setFromEuler(props.candle.rotation), props.candle.scale);
     const tips = CANDLE_TIPS.map(t => new THREE.Vector3(...t).applyMatrix4(m));
-    for (const p of tips) addFlame(p.x, p.y, p.z, 1.15);
+    for (const p of tips) addFlame(p.x, p.y, p.z, 0.75);
     const c = tips.reduce((a, p) => a.add(p), new THREE.Vector3()).multiplyScalar(1 / tips.length);
     candleKey.position.set(c.x, c.y + 0.1, c.z + 0.1);
     camera.fov = narrow ? 24 : 16; camera.updateProjectionMatrix();
@@ -171,7 +171,7 @@ export function createScene(host, { onCreak, onReady, onError } = {}) {
       const n = Math.sin(t * 9 + f.seed) * .5 + Math.sin(t * 23.7 + f.seed * 2) * .3 + Math.sin(t * 41 + f.seed) * .2;
       f.flame.scale.set(0.085 * f.base * (1 + n * .12), 0.19 * f.base * (1 + n * .28), 1);
       f.flame.material.rotation = n * .09;
-      f.halo.material.opacity = .26 + n * .1; f.halo.scale.setScalar(.55 * f.base * (1 + n * .18));
+      f.halo.material.opacity = .22 + n * .08; f.halo.scale.setScalar(.3 * f.base * (1 + n * .18));
       sum += n;
     }
     candleKey.intensity = flames.length ? 2.6 + (sum / flames.length) * .7 : 0;
